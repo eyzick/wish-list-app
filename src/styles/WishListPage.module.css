@@ -290,7 +290,7 @@
 
 .itemRow {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
 }
@@ -472,6 +472,47 @@
 .priorityButtonIcon {
   height: 0.875rem;
   width: 0.875rem;
+}
+
+.itemCardStarred {
+  background: linear-gradient(135deg, #fefce8 0%, #fef3c7 100%);
+  border-color: #eab308;
+  box-shadow: 0 1px 3px rgba(234, 179, 8, 0.1);
+}
+
+.starButton {
+  padding: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: none;
+  border: none;
+  border-radius: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.starButtonStarred {
+  color: #eab308;
+}
+
+.starButtonStarred:hover {
+  color: #ca8a04;
+  background-color: rgba(234, 179, 8, 0.1);
+}
+
+.starButtonUnstarred {
+  color: #9ca3af;
+}
+
+.starButtonUnstarred:hover {
+  color: #eab308;
+  background-color: rgba(234, 179, 8, 0.05);
+}
+
+.starButtonIcon {
+  height: 1rem;
+  width: 1rem;
 }
 
 .editListButton {

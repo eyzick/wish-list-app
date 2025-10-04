@@ -13,6 +13,7 @@ CREATE TABLE wish_items (
   name TEXT NOT NULL,
   link TEXT,
   is_bought BOOLEAN DEFAULT FALSE,
+  starred BOOLEAN DEFAULT FALSE,
   priority INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -21,6 +22,7 @@ CREATE TABLE wish_items (
 -- Create indexes for better performance
 CREATE INDEX idx_wish_items_list_id ON wish_items(wish_list_id);
 CREATE INDEX idx_wish_items_bought ON wish_items(is_bought);
+CREATE INDEX idx_wish_items_starred ON wish_items(starred);
 CREATE INDEX idx_wish_items_priority ON wish_items(wish_list_id, priority);
 
 -- Enable Row Level Security (RLS)

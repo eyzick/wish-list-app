@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { supabase, WishList, WishItem } from '../lib/supabase'
-import { ExternalLink, Check, ShoppingCart, Gift, Plus, GripVertical, Edit2, ChevronUp, ChevronDown } from 'lucide-react'
+import { ExternalLink, Check, ShoppingCart, Gift, Plus, GripVertical, Edit2, ChevronUp, ChevronDown, Star } from 'lucide-react'
 import toast, { Toaster } from 'react-hot-toast'
 import styles from '../styles/WishListPage.module.css'
 import {
@@ -29,6 +29,7 @@ interface SortableItemProps {
   onEdit: (item: WishItem) => void
   onMoveUp: (item: WishItem) => void
   onMoveDown: (item: WishItem) => void
+  onToggleStarred: (item: WishItem) => void
   isEditing: boolean
   editName: string
   editLink: string
@@ -45,6 +46,7 @@ const SortableItem: React.FC<SortableItemProps> = ({
   onEdit, 
   onMoveUp,
   onMoveDown,
+  onToggleStarred,
   isEditing,
   editName,
   editLink,
@@ -73,7 +75,7 @@ const SortableItem: React.FC<SortableItemProps> = ({
     <div
       ref={setNodeRef}
       style={style}
-      className={`${styles.itemCard} ${item.is_bought ? styles.itemCardBought : styles.itemCardUnbought} ${isMoving ? styles.itemCardMoving : ''}`}
+      className={`${styles.itemCard} ${item.is_bought ? styles.itemCardBought : styles.itemCardUnbought} ${item.starred ? styles.itemCardStarred : ''} ${isMoving ? styles.itemCardMoving : ''}`}
     >
       <div className={styles.itemContent}>
         {isEditing ? (
@@ -135,6 +137,13 @@ const SortableItem: React.FC<SortableItemProps> = ({
                 )}
               </div>
               <div className={styles.itemActions}>
+                <button
+                  onClick={() => onToggleStarred(item)}
+                  className={`${styles.starButton} ${item.starred ? styles.starButtonStarred : styles.starButtonUnstarred}`}
+                  title={item.starred ? 'Remove star' : 'Star this item'}
+                >
+                  <Star className={styles.starButtonIcon} />
+                </button>
                 <div className={styles.priorityButtons}>
                   <button
                     onClick={() => onMoveUp(item)}
@@ -263,6 +272,23 @@ const WishListPage: React.FC = () => {
       ))
     } catch (error) {
       console.error('Error updating wish item:', error)
+    }
+  }
+
+  const toggleItemStarred = async (item: WishItem) => {
+    try {
+      const { error } = await supabase
+        .from('wish_items')
+        .update({ starred: !item.starred })
+        .eq('id', item.id)
+
+      if (error) throw error
+
+      setWishItems(wishItems.map(i => 
+        i.id === item.id ? { ...i, starred: !i.starred } : i
+      ))
+    } catch (error) {
+      console.error('Error updating wish item starred status:', error)
     }
   }
 
@@ -727,6 +753,7 @@ const WishListPage: React.FC = () => {
                         onEdit={startEditItem}
                         onMoveUp={moveItemUp}
                         onMoveDown={moveItemDown}
+                        onToggleStarred={toggleItemStarred}
                         isEditing={editingItem?.id === item.id}
                         editName={editItemName}
                         editLink={editItemLink}
