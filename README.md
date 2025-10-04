@@ -1,46 +1,44 @@
-# Getting Started with Create React App
+# Wish List App
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A simple wish list application built with React, TypeScript, and Supabase. Create and manage multiple wish lists with items that can be marked as bought or unbought.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+- **Multiple Wish Lists**: Create and manage multiple wish lists
+- **Item Management**: Add items with names and optional links
+- **Bought Status**: Mark items as bought or unbought
+- **Priority Ordering**: Drag and drop items to reorder by priority
+- **Admin Panel**: Password-protected admin interface for deleting lists/items
+- **Responsive Design**: Works on desktop and mobile devices
 
-### `npm start`
+## How It Works
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+### Public Interface
+- View all available wish lists on the home page
+- Click on any list to view its items
+- Click the checkmark/X icon to toggle bought status
+- Click "View Link" to open item URLs in a new tab
+- Drag items by the grip handle to reorder by priority
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+### Admin Interface
+- Navigate to `/admin` and enter your admin password
+- Delete entire lists or individual items
+- Drag and drop items to reorder by priority
 
-### `npm test`
+## Tech Stack
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- **Frontend**: React 18 with TypeScript
+- **Styling**: CSS Modules
+- **Backend**: Supabase (PostgreSQL database)
+- **Authentication**: Environment variable-based admin password
+- **Icons**: Lucide React
+- **Routing**: React Router DOM
+- **Drag & Drop**: @dnd-kit
+- **Notifications**: React Hot Toast
 
-### `npm run build`
+## Database Schema
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+- **wish_lists**: Stores wish list information (id, name, timestamps)
+- **wish_items**: Stores individual items (id, wish_list_id, name, link, is_bought, priority, timestamps)
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
-
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
-
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
+Row Level Security (RLS) is enabled with public read access and admin-only delete access.
