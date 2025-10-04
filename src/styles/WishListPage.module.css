@@ -116,6 +116,7 @@
   border-radius: 0.375rem;
   margin-bottom: 0.5rem;
   outline: none;
+  box-sizing: border-box;
 }
 
 .input:focus {
