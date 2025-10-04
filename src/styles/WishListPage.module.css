@@ -297,31 +297,48 @@
 
 @media (max-width: 768px) {
   .itemRow {
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: row;
+    align-items: center;
     gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  
+  .dragHandle {
+    flex-shrink: 0;
+    padding: 0.5rem;
+    min-width: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   
   .itemInfo {
-    order: 1;
+    flex: 1;
+    min-width: 0;
   }
   
   .itemActions {
-    order: 2;
-    justify-content: space-between;
+    flex-shrink: 0;
+    justify-content: flex-end;
     flex-wrap: wrap;
     gap: 0.25rem;
   }
 }
 
 .dragHandle {
-  padding: 0.25rem;
+  padding: 0.5rem;
   color: #9ca3af;
   cursor: grab;
   transition: color 0.2s;
   background: none;
   border: none;
   border-radius: 0.25rem;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
 }
 
 .dragHandle:hover {
