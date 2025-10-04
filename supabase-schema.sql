@@ -48,13 +48,12 @@ CREATE POLICY "Allow public update access to wish_lists" ON wish_lists
 CREATE POLICY "Allow public update access to wish_items" ON wish_items
   FOR UPDATE USING (true);
 
--- Note: DELETE policies are intentionally omitted - only admins can delete
--- Admin delete operations will be handled through the application layer
--- You can add admin-specific delete policies if needed:
--- CREATE POLICY "Allow admin delete access to wish_lists" ON wish_lists
---   FOR DELETE USING (auth.role() = 'admin');
--- CREATE POLICY "Allow admin delete access to wish_items" ON wish_items
---   FOR DELETE USING (auth.role() = 'admin');
+-- Create policies for public delete access (admin check handled in app)
+CREATE POLICY "Allow public delete access to wish_lists" ON wish_lists
+  FOR DELETE USING (true);
+
+CREATE POLICY "Allow public delete access to wish_items" ON wish_items
+  FOR DELETE USING (true);
 
 -- Create function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

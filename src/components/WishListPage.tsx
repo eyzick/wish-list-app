@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { supabase, WishList, WishItem } from '../lib/supabase'
-import { ExternalLink, Check, ShoppingCart, Gift, Plus, GripVertical } from 'lucide-react'
+import { ExternalLink, Check, ShoppingCart, Gift, Plus, GripVertical, Edit2, ChevronUp, ChevronDown } from 'lucide-react'
 import toast, { Toaster } from 'react-hot-toast'
 import styles from '../styles/WishListPage.module.css'
 import {
@@ -26,9 +26,34 @@ import { CSS } from '@dnd-kit/utilities'
 interface SortableItemProps {
   item: WishItem
   onToggleBought: (item: WishItem) => void
+  onEdit: (item: WishItem) => void
+  onMoveUp: (item: WishItem) => void
+  onMoveDown: (item: WishItem) => void
+  isEditing: boolean
+  editName: string
+  editLink: string
+  onEditNameChange: (value: string) => void
+  onEditLinkChange: (value: string) => void
+  onSaveEdit: () => void
+  onCancelEdit: () => void
+  isMoving: boolean
 }
 
-const SortableItem: React.FC<SortableItemProps> = ({ item, onToggleBought }) => {
+const SortableItem: React.FC<SortableItemProps> = ({ 
+  item, 
+  onToggleBought, 
+  onEdit, 
+  onMoveUp,
+  onMoveDown,
+  isEditing,
+  editName,
+  editLink,
+  onEditNameChange,
+  onEditLinkChange,
+  onSaveEdit,
+  onCancelEdit,
+  isMoving
+}) => {
   const {
     attributes,
     listeners,
@@ -48,54 +73,112 @@ const SortableItem: React.FC<SortableItemProps> = ({ item, onToggleBought }) => 
     <div
       ref={setNodeRef}
       style={style}
-      className={`${styles.itemCard} ${item.is_bought ? styles.itemCardBought : styles.itemCardUnbought}`}
+      className={`${styles.itemCard} ${item.is_bought ? styles.itemCardBought : styles.itemCardUnbought} ${isMoving ? styles.itemCardMoving : ''}`}
     >
       <div className={styles.itemContent}>
-        <div className={styles.itemMain}>
-          <div className={styles.itemRow}>
-            <button
-              {...attributes}
-              {...listeners}
-              className={styles.dragHandle}
-              title="Drag to reorder items by priority"
-            >
-              <GripVertical className={styles.boughtButtonIcon} />
-            </button>
-            <div className={styles.itemInfo}>
-              <h3 className={`${styles.itemName} ${item.is_bought ? styles.itemNameBought : styles.itemNameUnbought}`}>
-                {item.name}
-              </h3>
-              {item.link && (
-                <a
-                  href={item.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.itemLink}
-                >
-                  <ExternalLink className={styles.itemLinkIcon} />
-                  View Link
-                </a>
-              )}
+        {isEditing ? (
+          <div className={styles.editForm}>
+            <input
+              type="text"
+              placeholder="Item name"
+              value={editName}
+              onChange={(e) => onEditNameChange(e.target.value)}
+              className={styles.input}
+            />
+            <input
+              type="url"
+              placeholder="Item link (optional)"
+              value={editLink}
+              onChange={(e) => onEditLinkChange(e.target.value)}
+              className={styles.input}
+            />
+            <div className={styles.buttonGroup}>
+              <button
+                onClick={onSaveEdit}
+                className={`${styles.button} ${styles.buttonPrimary}`}
+              >
+                Save
+              </button>
+              <button
+                onClick={onCancelEdit}
+                className={`${styles.button} ${styles.buttonSecondary}`}
+              >
+                Cancel
+              </button>
             </div>
-            <button
-              onClick={() => onToggleBought(item)}
-              className={`${styles.boughtButton} ${item.is_bought ? styles.boughtButtonBought : styles.boughtButtonUnbought}`}
-              title={item.is_bought ? 'Click to mark as not bought' : 'Click to mark as bought'}
-            >
-              {item.is_bought ? (
-                <>
-                  <Check className={styles.boughtButtonIcon} />
-                  <span>Bought</span>
-                </>
-              ) : (
-                <>
-                  <ShoppingCart className={styles.boughtButtonIcon} />
-                  <span>Mark as Bought</span>
-                </>
-              )}
-            </button>
           </div>
-        </div>
+        ) : (
+          <div className={styles.itemMain}>
+            <div className={styles.itemRow}>
+              <button
+                {...attributes}
+                {...listeners}
+                className={styles.dragHandle}
+                title="Drag to reorder items by priority"
+              >
+                <GripVertical className={styles.boughtButtonIcon} />
+              </button>
+              <div className={styles.itemInfo}>
+                <h3 className={`${styles.itemName} ${item.is_bought ? styles.itemNameBought : styles.itemNameUnbought}`}>
+                  {item.name}
+                </h3>
+                {item.link && (
+                  <a
+                    href={item.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.itemLink}
+                  >
+                    <ExternalLink className={styles.itemLinkIcon} />
+                    View Link
+                  </a>
+                )}
+              </div>
+              <div className={styles.itemActions}>
+                <div className={styles.priorityButtons}>
+                  <button
+                    onClick={() => onMoveUp(item)}
+                    className={styles.priorityButton}
+                    title="Move up in priority"
+                  >
+                    <ChevronUp className={styles.priorityButtonIcon} />
+                  </button>
+                  <button
+                    onClick={() => onMoveDown(item)}
+                    className={styles.priorityButton}
+                    title="Move down in priority"
+                  >
+                    <ChevronDown className={styles.priorityButtonIcon} />
+                  </button>
+                </div>
+                <button
+                  onClick={() => onEdit(item)}
+                  className={styles.editButton}
+                  title="Edit item"
+                >
+                  <Edit2 className={styles.editButtonIcon} />
+                </button>
+                <button
+                  onClick={() => onToggleBought(item)}
+                  className={`${styles.boughtButton} ${item.is_bought ? styles.boughtButtonBought : styles.boughtButtonUnbought}`}
+                  title={item.is_bought ? 'Click to mark as not bought' : 'Click to mark as bought'}
+                >
+                  {item.is_bought ? (
+                    <>
+                      <Check className={styles.boughtButtonIcon} />
+                      <span>Bought</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart className={styles.boughtButtonIcon} />
+                      <span>Mark as Bought</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -112,6 +195,12 @@ const WishListPage: React.FC = () => {
   const [newItemName, setNewItemName] = useState('')
   const [newItemLink, setNewItemLink] = useState('')
   const [hasShownDragTip, setHasShownDragTip] = useState(false)
+  const [editingItem, setEditingItem] = useState<WishItem | null>(null)
+  const [editingList, setEditingList] = useState<WishList | null>(null)
+  const [editItemName, setEditItemName] = useState('')
+  const [editItemLink, setEditItemLink] = useState('')
+  const [editListName, setEditListName] = useState('')
+  const [movingItemId, setMovingItemId] = useState<string | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -239,6 +328,164 @@ const WishListPage: React.FC = () => {
     }
   }
 
+  const startEditItem = (item: WishItem) => {
+    setEditingItem(item)
+    setEditItemName(item.name)
+    setEditItemLink(item.link || '')
+  }
+
+  const startEditList = (list: WishList) => {
+    setEditingList(list)
+    setEditListName(list.name)
+  }
+
+  const saveEditItem = async () => {
+    if (!editingItem || !editItemName.trim()) return
+
+    try {
+      const { error } = await supabase
+        .from('wish_items')
+        .update({
+          name: editItemName.trim(),
+          link: editItemLink.trim() || null
+        })
+        .eq('id', editingItem.id)
+
+      if (error) throw error
+
+      // Update local state
+      setWishItems(wishItems.map(item => 
+        item.id === editingItem.id 
+          ? { ...item, name: editItemName.trim(), link: editItemLink.trim() || null }
+          : item
+      ))
+
+      setEditingItem(null)
+      setEditItemName('')
+      setEditItemLink('')
+    } catch (error) {
+      console.error('Error updating wish item:', error)
+    }
+  }
+
+  const saveEditList = async () => {
+    if (!editingList || !editListName.trim()) return
+
+    try {
+      const { error } = await supabase
+        .from('wish_lists')
+        .update({ name: editListName.trim() })
+        .eq('id', editingList.id)
+
+      if (error) throw error
+
+      // Update local state
+      setWishLists(wishLists.map(list => 
+        list.id === editingList.id 
+          ? { ...list, name: editListName.trim() }
+          : list
+      ))
+
+      // Update selected list if it's the one being edited
+      if (selectedList?.id === editingList.id) {
+        setSelectedList({ ...selectedList, name: editListName.trim() })
+      }
+
+      setEditingList(null)
+      setEditListName('')
+    } catch (error) {
+      console.error('Error updating wish list:', error)
+    }
+  }
+
+  const cancelEdit = () => {
+    setEditingItem(null)
+    setEditingList(null)
+    setEditItemName('')
+    setEditItemLink('')
+    setEditListName('')
+  }
+
+  const moveItemUp = async (item: WishItem) => {
+    const currentIndex = wishItems.findIndex(i => i.id === item.id)
+    if (currentIndex <= 0) return // Already at top
+
+    // Start animation
+    setMovingItemId(item.id)
+
+    const newItems = [...wishItems]
+    const temp = newItems[currentIndex]
+    newItems[currentIndex] = newItems[currentIndex - 1]
+    newItems[currentIndex - 1] = temp
+
+    // Update priorities in database
+    try {
+      const updates = newItems.map((item, index) => ({
+        id: item.id,
+        priority: index
+      }))
+
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('wish_items')
+          .update({ priority: update.priority })
+          .eq('id', update.id)
+        
+        if (error) throw error
+      }
+
+      setWishItems(newItems)
+      
+      // End animation after a short delay
+      setTimeout(() => {
+        setMovingItemId(null)
+      }, 300)
+    } catch (error) {
+      console.error('Error moving item up:', error)
+      setMovingItemId(null)
+    }
+  }
+
+  const moveItemDown = async (item: WishItem) => {
+    const currentIndex = wishItems.findIndex(i => i.id === item.id)
+    if (currentIndex >= wishItems.length - 1) return // Already at bottom
+
+    // Start animation
+    setMovingItemId(item.id)
+
+    const newItems = [...wishItems]
+    const temp = newItems[currentIndex]
+    newItems[currentIndex] = newItems[currentIndex + 1]
+    newItems[currentIndex + 1] = temp
+
+    // Update priorities in database
+    try {
+      const updates = newItems.map((item, index) => ({
+        id: item.id,
+        priority: index
+      }))
+
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('wish_items')
+          .update({ priority: update.priority })
+          .eq('id', update.id)
+        
+        if (error) throw error
+      }
+
+      setWishItems(newItems)
+      
+      // End animation after a short delay
+      setTimeout(() => {
+        setMovingItemId(null)
+      }, 300)
+    } catch (error) {
+      console.error('Error moving item down:', error)
+      setMovingItemId(null)
+    }
+  }
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
 
@@ -342,14 +589,51 @@ const WishListPage: React.FC = () => {
                 <div
                   key={list.id}
                   className={`${styles.listItem} ${selectedList?.id === list.id ? styles.listItemSelected : ''}`}
-                  onClick={() => setSelectedList(list)}
                 >
-                  <div className={styles.listItemContent}>
-                    <span className={styles.listItemName}>{list.name}</span>
-                    <p className={styles.listItemDate}>
-                      Created {new Date(list.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
+                  {editingList?.id === list.id ? (
+                    <div className={styles.editForm}>
+                      <input
+                        type="text"
+                        placeholder="List name"
+                        value={editListName}
+                        onChange={(e) => setEditListName(e.target.value)}
+                        className={styles.input}
+                      />
+                      <div className={styles.buttonGroup}>
+                        <button
+                          onClick={saveEditList}
+                          className={`${styles.button} ${styles.buttonPrimary}`}
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={cancelEdit}
+                          className={`${styles.button} ${styles.buttonSecondary}`}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={styles.listItemContent} onClick={() => setSelectedList(list)}>
+                      <div className={styles.listItemHeader}>
+                        <span className={styles.listItemName}>{list.name}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            startEditList(list)
+                          }}
+                          className={styles.editListButton}
+                          title="Edit list name"
+                        >
+                          <Edit2 className={styles.editButtonIcon} />
+                        </button>
+                      </div>
+                      <p className={styles.listItemDate}>
+                        Created {new Date(list.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  )}
                 </div>
               ))}
               {wishLists.length === 0 && (
@@ -424,61 +708,72 @@ const WishListPage: React.FC = () => {
             )}
 
             {selectedList && (
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext
-                  items={wishItems.map(item => item.id)}
-                  strategy={verticalListSortingStrategy}
+              <>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
                 >
-                  <div className={styles.itemContainer}>
-                    {wishItems.map((item) => (
+                  <SortableContext
+                    items={wishItems.map(item => item.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className={styles.itemContainer}>
+                      {wishItems.map((item) => (
                       <SortableItem
                         key={item.id}
                         item={item}
                         onToggleBought={toggleItemBought}
+                        onEdit={startEditItem}
+                        onMoveUp={moveItemUp}
+                        onMoveDown={moveItemDown}
+                        isEditing={editingItem?.id === item.id}
+                        editName={editItemName}
+                        editLink={editItemLink}
+                        onEditNameChange={setEditItemName}
+                        onEditLinkChange={setEditItemLink}
+                        onSaveEdit={saveEditItem}
+                        onCancelEdit={cancelEdit}
+                        isMoving={movingItemId === item.id}
                       />
-                    ))}
-                    {wishItems.length === 0 && (
-                      <div className={styles.emptyState}>
-                        <GripVertical className={styles.emptyStateIcon} />
-                        <p>No items in this list yet</p>
-                        <p className={styles.emptyStateText}>Add items and drag to reorder by priority</p>
+                      ))}
+                      {wishItems.length === 0 && (
+                        <div className={styles.emptyState}>
+                          <GripVertical className={styles.emptyStateIcon} />
+                          <p>No items in this list yet</p>
+                          <p className={styles.emptyStateText}>Add items and drag to reorder by priority</p>
+                        </div>
+                      )}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+
+                {/* Summary */}
+                <div className={styles.summaryCard}>
+                  <h3 className={styles.summaryTitle}>Summary</h3>
+                  <div className={styles.summaryGrid}>
+                    <div className={`${styles.summaryItem} ${styles.summaryItemTotal}`}>
+                      <div className={`${styles.summaryNumber} ${styles.summaryNumberTotal}`}>{wishItems.length}</div>
+                      <div className={`${styles.summaryLabel} ${styles.summaryLabelTotal}`}>Total Items</div>
+                    </div>
+                    <div className={`${styles.summaryItem} ${styles.summaryItemBought}`}>
+                      <div className={`${styles.summaryNumber} ${styles.summaryNumberBought}`}>
+                        {wishItems.filter(item => item.is_bought).length}
                       </div>
-                    )}
+                      <div className={`${styles.summaryLabel} ${styles.summaryLabelBought}`}>Bought</div>
+                    </div>
+                    <div className={`${styles.summaryItem} ${styles.summaryItemRemaining}`}>
+                      <div className={`${styles.summaryNumber} ${styles.summaryNumberRemaining}`}>
+                        {wishItems.filter(item => !item.is_bought).length}
+                      </div>
+                      <div className={`${styles.summaryLabel} ${styles.summaryLabelRemaining}`}>Remaining</div>
+                    </div>
                   </div>
-                </SortableContext>
-              </DndContext>
+                </div>
+              </>
             )}
           </div>
         </div>
-
-        {/* Summary */}
-        {selectedList && (
-          <div className={styles.summaryCard}>
-            <h3 className={styles.summaryTitle}>Summary</h3>
-            <div className={styles.summaryGrid}>
-              <div className={`${styles.summaryItem} ${styles.summaryItemTotal}`}>
-                <div className={`${styles.summaryNumber} ${styles.summaryNumberTotal}`}>{wishItems.length}</div>
-                <div className={`${styles.summaryLabel} ${styles.summaryLabelTotal}`}>Total Items</div>
-              </div>
-              <div className={`${styles.summaryItem} ${styles.summaryItemBought}`}>
-                <div className={`${styles.summaryNumber} ${styles.summaryNumberBought}`}>
-                  {wishItems.filter(item => item.is_bought).length}
-                </div>
-                <div className={`${styles.summaryLabel} ${styles.summaryLabelBought}`}>Bought</div>
-              </div>
-              <div className={`${styles.summaryItem} ${styles.summaryItemRemaining}`}>
-                <div className={`${styles.summaryNumber} ${styles.summaryNumberRemaining}`}>
-                  {wishItems.filter(item => !item.is_bought).length}
-                </div>
-                <div className={`${styles.summaryLabel} ${styles.summaryLabelRemaining}`}>Remaining</div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
