@@ -10,7 +10,7 @@ import styles from './styles/App.module.css';
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router basename="/wish-list-app">
         <div className={styles.container}>
           <Navigation />
           <Routes>
