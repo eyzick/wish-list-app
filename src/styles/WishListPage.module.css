@@ -315,6 +315,18 @@
   .itemInfo {
     flex: 1;
     min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+  }
+  
+  .itemName {
+    width: 100%;
+    max-width: 100%;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: break-word;
+    display: block;
   }
   
   .itemActions {
@@ -360,12 +372,18 @@
 .itemName {
   font-weight: 500;
   line-height: 1.4;
-  word-break: break-word;
+  word-break: normal;
+  overflow-wrap: break-word;
+  display: block;
+  width: 100%;
 }
 
 .itemNameBought {
   color: #166534;
   text-decoration: line-through;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 .itemNameUnbought {
