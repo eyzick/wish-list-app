@@ -210,6 +210,23 @@ const WishListPage: React.FC = () => {
   const [editItemLink, setEditItemLink] = useState('')
   const [editListName, setEditListName] = useState('')
   const [movingItemId, setMovingItemId] = useState<string | null>(null)
+  const [excludeBoughtLists, setExcludeBoughtLists] = useState<Set<string>>(new Set())
+
+  const toggleExcludeBought = (listId: string) => {
+    setExcludeBoughtLists(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(listId)) {
+        newSet.delete(listId)
+      } else {
+        newSet.add(listId)
+      }
+      return newSet
+    })
+  }
+
+  const filteredWishItems = selectedList && excludeBoughtLists.has(selectedList.id)
+    ? wishItems.filter(item => !item.is_bought)
+    : wishItems
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -516,10 +533,27 @@ const WishListPage: React.FC = () => {
     const { active, over } = event
 
     if (over && active.id !== over.id) {
-      const oldIndex = wishItems.findIndex(item => item.id === active.id)
-      const newIndex = wishItems.findIndex(item => item.id === over.id)
+      // Use filtered items for drag indices
+      const oldIndex = filteredWishItems.findIndex(item => item.id === active.id)
+      const newIndex = filteredWishItems.findIndex(item => item.id === over.id)
       
-      const newItems = arrayMove(wishItems, oldIndex, newIndex)
+      if (oldIndex === -1 || newIndex === -1) return
+      
+      // Reorder the filtered items
+      const newFilteredItems = arrayMove(filteredWishItems, oldIndex, newIndex)
+      
+      // If we're filtering, merge with bought items maintaining their relative order
+      // Otherwise, just use the reordered items
+      let newItems: WishItem[]
+      if (selectedList && excludeBoughtLists.has(selectedList.id)) {
+        // Get bought items in their current order
+        const boughtItems = wishItems.filter(item => item.is_bought).sort((a, b) => a.priority - b.priority)
+        // Combine: reordered unbought items first, then bought items
+        newItems = [...newFilteredItems, ...boughtItems]
+      } else {
+        newItems = newFilteredItems
+      }
+      
       setWishItems(newItems)
 
       // Update priorities in the database
@@ -678,13 +712,24 @@ const WishListPage: React.FC = () => {
                 {selectedList ? `${selectedList.name} Items` : 'Select a List'}
               </h2>
               {selectedList && (
-                <button
-                  onClick={() => setShowAddItem(true)}
-                  className={styles.addButton}
-                >
-                  <Plus className={styles.addButtonIcon} />
-                  Add Item
-                </button>
+                <div className={styles.cardHeaderActions}>
+                  <label className={styles.toggleLabel}>
+                    <input
+                      type="checkbox"
+                      checked={excludeBoughtLists.has(selectedList.id)}
+                      onChange={() => toggleExcludeBought(selectedList.id)}
+                      className={styles.toggleCheckbox}
+                    />
+                    <span className={styles.toggleText}>Hide bought items</span>
+                  </label>
+                  <button
+                    onClick={() => setShowAddItem(true)}
+                    className={styles.addButton}
+                  >
+                    <Plus className={styles.addButtonIcon} />
+                    Add Item
+                  </button>
+                </div>
               )}
             </div>
             
@@ -741,11 +786,11 @@ const WishListPage: React.FC = () => {
                   onDragEnd={handleDragEnd}
                 >
                   <SortableContext
-                    items={wishItems.map(item => item.id)}
+                    items={filteredWishItems.map(item => item.id)}
                     strategy={verticalListSortingStrategy}
                   >
                     <div className={styles.itemContainer}>
-                      {wishItems.map((item) => (
+                      {filteredWishItems.map((item) => (
                       <SortableItem
                         key={item.id}
                         item={item}
@@ -764,7 +809,7 @@ const WishListPage: React.FC = () => {
                         isMoving={movingItemId === item.id}
                       />
                       ))}
-                      {wishItems.length === 0 && (
+                      {filteredWishItems.length === 0 && (
                         <div className={styles.emptyState}>
                           <GripVertical className={styles.emptyStateIcon} />
                           <p>No items in this list yet</p>

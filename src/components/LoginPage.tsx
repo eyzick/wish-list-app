@@ -66,7 +66,7 @@ const LoginPage: React.FC = () => {
             <div className={styles.error}>{error}</div>
           )}
 
-          <div>
+          <div className={styles.buttonContainer}>
             <button
               type="submit"
               className={styles.submitButton}
