@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { supabase, WishList, WishItem } from '../lib/supabase'
-import { ExternalLink, Check, ShoppingCart, Gift, Plus, GripVertical, Edit2, ChevronUp, ChevronDown, Star } from 'lucide-react'
+import { supabase, WishList, WishItem, ListFolder } from '../lib/supabase'
+import { ExternalLink, Check, ShoppingCart, Gift, Plus, GripVertical, Edit2, ChevronUp, ChevronDown, Star, Folder, FolderPlus, CandyCane } from 'lucide-react'
 import toast, { Toaster } from 'react-hot-toast'
 import styles from '../styles/WishListPage.module.css'
 import {
@@ -11,6 +11,8 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragStartEvent,
+  DragOverEvent,
 } from '@dnd-kit/core'
 import {
   arrayMove,
@@ -193,24 +195,136 @@ const SortableItem: React.FC<SortableItemProps> = ({
   )
 }
 
+interface DraggableListProps {
+  list: WishList
+  onClick: () => void
+  isSelected: boolean
+  children: React.ReactNode
+}
+
+const DraggableList: React.FC<DraggableListProps> = ({ list, onClick, isSelected, children }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    isDragging,
+  } = useSortable({ 
+    id: list.id,
+    data: {
+      type: 'list',
+      list,
+    }
+  })
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={`${styles.listItem} ${isSelected ? styles.listItemSelected : ''}`}
+      onClick={onClick}
+    >
+      {children}
+    </div>
+  )
+}
+
+interface DroppableFolderProps {
+  folder: ListFolder
+  children: React.ReactNode
+  isExpanded: boolean
+  onToggle: () => void
+  onEdit: () => void
+}
+
+const DroppableFolder: React.FC<DroppableFolderProps> = ({ folder, children, isExpanded, onToggle, onEdit }) => {
+  const { setNodeRef, isOver } = useSortable({
+    id: folder.id,
+    data: {
+      type: 'folder',
+      folder,
+    }
+  })
+
+  return (
+    <div ref={setNodeRef} className={styles.folderContainer}>
+      <div 
+        className={`${styles.folderHeader} ${isOver ? styles.folderHeaderOver : ''}`}
+        onClick={onToggle}
+      >
+        <div className={styles.folderTitle}>
+          {isExpanded ? (
+            <ChevronDown className={styles.folderIcon} />
+          ) : (
+            <ChevronUp className={styles.folderIcon} />
+          )}
+          <Folder className={styles.folderIcon} />
+          <span>{folder.name}</span>
+        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onEdit()
+          }}
+          className={styles.editListButton}
+          title="Edit folder"
+        >
+          <Edit2 className={styles.editButtonIcon} />
+        </button>
+      </div>
+      {isExpanded && children}
+    </div>
+  )
+}
+
+const DroppableAvailableLists: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { setNodeRef } = useSortable({ 
+    id: 'available-lists',
+    data: { type: 'available-lists-area' } 
+  });
+  
+  return (
+    <div ref={setNodeRef} className="min-h-[50px]">
+      {children}
+    </div>
+  );
+};
+
 const WishListPage: React.FC = () => {
   const [wishLists, setWishLists] = useState<WishList[]>([])
+  const [folders, setFolders] = useState<ListFolder[]>([])
   const [selectedList, setSelectedList] = useState<WishList | null>(null)
   const [wishItems, setWishItems] = useState<WishItem[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddList, setShowAddList] = useState(false)
   const [showAddItem, setShowAddItem] = useState(false)
+  const [showAddFolder, setShowAddFolder] = useState(false)
   const [newListName, setNewListName] = useState('')
+  const [newFolderName, setNewFolderName] = useState('')
+  const [newListIsChristmas, setNewListIsChristmas] = useState(false)
+  const [newListFolderId, setNewListFolderId] = useState<string>('')
   const [newItemName, setNewItemName] = useState('')
   const [newItemLink, setNewItemLink] = useState('')
   const [hasShownDragTip, setHasShownDragTip] = useState(false)
   const [editingItem, setEditingItem] = useState<WishItem | null>(null)
   const [editingList, setEditingList] = useState<WishList | null>(null)
+  const [editingFolder, setEditingFolder] = useState<ListFolder | null>(null)
+  const [editFolderName, setEditFolderName] = useState('')
   const [editItemName, setEditItemName] = useState('')
   const [editItemLink, setEditItemLink] = useState('')
   const [editListName, setEditListName] = useState('')
+  const [editListIsChristmas, setEditListIsChristmas] = useState(false)
+  const [editListFolderId, setEditListFolderId] = useState<string>('')
   const [movingItemId, setMovingItemId] = useState<string | null>(null)
   const [excludeBoughtLists, setExcludeBoughtLists] = useState<Set<string>>(new Set())
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
 
   const toggleExcludeBought = (listId: string) => {
     setExcludeBoughtLists(prev => {
@@ -224,12 +338,63 @@ const WishListPage: React.FC = () => {
     })
   }
 
+  const toggleFolder = (folderId: string) => {
+    setExpandedFolders(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(folderId)) {
+        newSet.delete(folderId)
+      } else {
+        newSet.add(folderId)
+      }
+      return newSet
+    })
+  }
+
+  const fetchFolders = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('list_folders')
+        .select('*')
+        .order('name', { ascending: true })
+
+      if (error) throw error
+      setFolders(data || [])
+      // Expand all folders by default
+      setExpandedFolders(new Set(data?.map(f => f.id) || []))
+    } catch (error) {
+      console.error('Error fetching folders:', error)
+    }
+  }
+
+  const addFolder = async () => {
+    if (!newFolderName.trim()) return
+
+    try {
+      const { data, error } = await supabase
+        .from('list_folders')
+        .insert([{ name: newFolderName.trim() }])
+        .select()
+
+      if (error) throw error
+      setFolders([...folders, data[0]])
+      setNewFolderName('')
+      setShowAddFolder(false)
+      setExpandedFolders(prev => new Set(prev).add(data[0].id))
+    } catch (error) {
+      console.error('Error adding folder:', error)
+    }
+  }
+
   const filteredWishItems = selectedList && excludeBoughtLists.has(selectedList.id)
     ? wishItems.filter(item => !item.is_bought)
     : wishItems
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -237,6 +402,7 @@ const WishListPage: React.FC = () => {
 
   useEffect(() => {
     fetchWishLists()
+    fetchFolders()
   }, [])
 
   useEffect(() => {
@@ -315,12 +481,18 @@ const WishListPage: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('wish_lists')
-        .insert([{ name: newListName.trim() }])
+        .insert([{ 
+          name: newListName.trim(),
+          is_christmas: newListIsChristmas,
+          folder_id: newListFolderId || null
+        }])
         .select()
 
       if (error) throw error
       setWishLists([data[0], ...wishLists])
       setNewListName('')
+      setNewListIsChristmas(false)
+      setNewListFolderId('')
       setShowAddList(false)
     } catch (error) {
       console.error('Error adding wish list:', error)
@@ -371,6 +543,39 @@ const WishListPage: React.FC = () => {
     }
   }
 
+  const startEditFolder = (folder: ListFolder) => {
+    setEditingFolder(folder)
+    setEditFolderName(folder.name)
+  }
+
+  const saveEditFolder = async () => {
+    if (!editingFolder || !editFolderName.trim()) return
+
+    try {
+      const { error } = await supabase
+        .from('list_folders')
+        .update({ name: editFolderName.trim() })
+        .eq('id', editingFolder.id)
+
+      if (error) throw error
+
+      setFolders(folders.map(f => 
+        f.id === editingFolder.id 
+          ? { ...f, name: editFolderName.trim() }
+          : f
+      ))
+      setEditingFolder(null)
+      setEditFolderName('')
+    } catch (error) {
+      console.error('Error updating folder:', error)
+    }
+  }
+
+  const cancelEditFolder = () => {
+    setEditingFolder(null)
+    setEditFolderName('')
+  }
+
   const startEditItem = (item: WishItem) => {
     setEditingItem(item)
     setEditItemName(item.name)
@@ -380,6 +585,8 @@ const WishListPage: React.FC = () => {
   const startEditList = (list: WishList) => {
     setEditingList(list)
     setEditListName(list.name)
+    setEditListIsChristmas(list.is_christmas)
+    setEditListFolderId(list.folder_id || '')
   }
 
   const saveEditItem = async () => {
@@ -417,7 +624,11 @@ const WishListPage: React.FC = () => {
     try {
       const { error } = await supabase
         .from('wish_lists')
-        .update({ name: editListName.trim() })
+        .update({ 
+          name: editListName.trim(),
+          is_christmas: editListIsChristmas,
+          folder_id: editListFolderId || null
+        })
         .eq('id', editingList.id)
 
       if (error) throw error
@@ -425,17 +636,19 @@ const WishListPage: React.FC = () => {
       // Update local state
       setWishLists(wishLists.map(list => 
         list.id === editingList.id 
-          ? { ...list, name: editListName.trim() }
+          ? { ...list, name: editListName.trim(), is_christmas: editListIsChristmas, folder_id: editListFolderId || null }
           : list
       ))
 
       // Update selected list if it's the one being edited
       if (selectedList?.id === editingList.id) {
-        setSelectedList({ ...selectedList, name: editListName.trim() })
+        setSelectedList({ ...selectedList, name: editListName.trim(), is_christmas: editListIsChristmas, folder_id: editListFolderId || null })
       }
 
       setEditingList(null)
       setEditListName('')
+      setEditListIsChristmas(false)
+      setEditListFolderId('')
     } catch (error) {
       console.error('Error updating wish list:', error)
     }
@@ -447,6 +660,8 @@ const WishListPage: React.FC = () => {
     setEditItemName('')
     setEditItemLink('')
     setEditListName('')
+    setEditListIsChristmas(false)
+    setEditListFolderId('')
   }
 
   const moveItemUp = async (item: WishItem) => {
@@ -529,8 +744,79 @@ const WishListPage: React.FC = () => {
     }
   }
 
+  const [activeListId, setActiveListId] = useState<string | null>(null)
+
+  const handleDragStart = (event: DragStartEvent) => {
+    if (event.active.data.current?.type === 'list') {
+      setActiveListId(event.active.id as string)
+    }
+  }
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
+    setActiveListId(null)
+
+    if (!over) return
+
+    // Handle List dropping into Folder
+    if (active.data.current?.type === 'list' && over.data.current?.type === 'folder') {
+      const listId = active.id as string
+      const folderId = over.id as string
+      const list = wishLists.find(l => l.id === listId)
+
+      if (list && list.folder_id !== folderId) {
+        // Update UI optimistic
+        setWishLists(prev => prev.map(l => 
+          l.id === listId ? { ...l, folder_id: folderId } : l
+        ))
+        
+        // Expand folder
+        setExpandedFolders(prev => new Set(prev).add(folderId))
+
+        // Update DB
+        try {
+          const { error } = await supabase
+            .from('wish_lists')
+            .update({ folder_id: folderId })
+            .eq('id', listId)
+
+          if (error) throw error
+        } catch (error) {
+          console.error('Error moving list to folder:', error)
+          // Revert
+          fetchWishLists()
+        }
+      }
+      return
+    }
+    
+    // Handle List dropping out of Folder (drop on available lists area)
+    if (active.data.current?.type === 'list' && over.id === 'available-lists') {
+        const listId = active.id as string
+        const list = wishLists.find(l => l.id === listId)
+
+        if (list && list.folder_id) {
+           // Update UI optimistic
+           setWishLists(prev => prev.map(l => 
+            l.id === listId ? { ...l, folder_id: null } : l
+          ))
+
+          // Update DB
+          try {
+            const { error } = await supabase
+              .from('wish_lists')
+              .update({ folder_id: null })
+              .eq('id', listId)
+  
+            if (error) throw error
+          } catch (error) {
+            console.error('Error removing list from folder:', error)
+            // Revert
+            fetchWishLists()
+          }
+        }
+        return
+    }
 
     if (over && active.id !== over.id) {
       // Use filtered items for drag indices
@@ -577,6 +863,85 @@ const WishListPage: React.FC = () => {
     }
   }
 
+  const renderListItemContent = (list: WishList) => {
+    if (editingList?.id === list.id) {
+      return (
+        <div className={styles.editForm}>
+          <input
+            type="text"
+            placeholder="List name"
+            value={editListName}
+            onChange={(e) => setEditListName(e.target.value)}
+            className={styles.input}
+          />
+          <div className={styles.formRow}>
+            <select
+              value={editListFolderId}
+              onChange={(e) => setEditListFolderId(e.target.value)}
+              className={styles.select}
+            >
+              <option value="">No Folder</option>
+              {folders.map(folder => (
+                <option key={folder.id} value={folder.id}>{folder.name}</option>
+              ))}
+            </select>
+            <label className={styles.checkboxLabel}>
+              <input
+                type="checkbox"
+                checked={editListIsChristmas}
+                onChange={(e) => setEditListIsChristmas(e.target.checked)}
+                className={styles.checkbox}
+              />
+              <span className={styles.checkboxText}>Christmas List</span>
+            </label>
+          </div>
+          <div className={styles.buttonGroup}>
+            <button
+              onClick={saveEditList}
+              className={`${styles.button} ${styles.buttonPrimary}`}
+            >
+              Save
+            </button>
+            <button
+              onClick={cancelEdit}
+              className={`${styles.button} ${styles.buttonSecondary}`}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className={styles.listItemContent} onClick={() => {}}>
+        <div className={styles.listItemHeader}>
+          <span className={styles.listItemName}>
+            {list.name}
+            {list.is_christmas && (
+              <span title="Christmas List">
+                <CandyCane className={`${styles.christmasIcon} text-red-500 ml-2 h-4 w-4 inline`} />
+              </span>
+            )}
+          </span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              startEditList(list)
+            }}
+            className={styles.editListButton}
+            title="Edit list"
+          >
+            <Edit2 className={styles.editButtonIcon} />
+          </button>
+        </div>
+        <p className={styles.listItemDate}>
+          Created {new Date(list.created_at).toLocaleDateString()}
+        </p>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className={styles.loadingContainer}>
@@ -605,14 +970,54 @@ const WishListPage: React.FC = () => {
           <div className={styles.card}>
             <div className={styles.cardHeader}>
               <h2 className={styles.cardTitle}>Available Lists</h2>
-              <button
-                onClick={() => setShowAddList(true)}
-                className={styles.addButton}
-              >
-                <Plus className={styles.addButtonIcon} />
-                Add List
-              </button>
+              <div className={styles.headerActions}>
+                <button
+                  onClick={() => setShowAddFolder(true)}
+                  className={styles.addButton}
+                  title="Create a new folder"
+                >
+                  <FolderPlus className={styles.addButtonIcon} />
+                  Create Folder
+                </button>
+                <button
+                  onClick={() => setShowAddList(true)}
+                  className={styles.addButton}
+                >
+                  <Plus className={styles.addButtonIcon} />
+                  Add List
+                </button>
+              </div>
             </div>
+
+            {showAddFolder && (
+              <div className={styles.addForm}>
+                <input
+                  type="text"
+                  placeholder="Folder name"
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  className={styles.input}
+                />
+                <div className={styles.buttonGroup}>
+                  <button
+                    onClick={addFolder}
+                    disabled={!newFolderName.trim()}
+                    className={`${styles.button} ${styles.buttonPrimary}`}
+                  >
+                    Add Folder
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowAddFolder(false)
+                      setNewFolderName('')
+                    }}
+                    className={`${styles.button} ${styles.buttonSecondary}`}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
 
             {showAddList && (
               <div className={styles.addForm}>
@@ -623,6 +1028,27 @@ const WishListPage: React.FC = () => {
                   onChange={(e) => setNewListName(e.target.value)}
                   className={styles.input}
                 />
+                <div className={styles.formRow}>
+                  <select
+                    value={newListFolderId}
+                    onChange={(e) => setNewListFolderId(e.target.value)}
+                    className={styles.select}
+                  >
+                    <option value="">No Folder</option>
+                    {folders.map(folder => (
+                      <option key={folder.id} value={folder.id}>{folder.name}</option>
+                    ))}
+                  </select>
+                  <label className={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      checked={newListIsChristmas}
+                      onChange={(e) => setNewListIsChristmas(e.target.checked)}
+                      className={styles.checkbox}
+                    />
+                    <span className={styles.checkboxText}>Christmas List</span>
+                  </label>
+                </div>
                 <div className={styles.buttonGroup}>
                   <button
                     onClick={addWishList}
@@ -635,6 +1061,8 @@ const WishListPage: React.FC = () => {
                     onClick={() => {
                       setShowAddList(false)
                       setNewListName('')
+                      setNewListIsChristmas(false)
+                      setNewListFolderId('')
                     }}
                     className={`${styles.button} ${styles.buttonSecondary}`}
                   >
@@ -645,29 +1073,47 @@ const WishListPage: React.FC = () => {
             )}
 
             <div className={styles.listContainer}>
-              {wishLists.map((list) => (
-                <div
-                  key={list.id}
-                  className={`${styles.listItem} ${selectedList?.id === list.id ? styles.listItemSelected : ''}`}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+              >
+              <SortableContext items={folders.map(f => f.id)}>
+              {/* Folders */}
+              {folders.map(folder => (
+                <DroppableFolder 
+                  key={folder.id} 
+                  folder={folder}
+                  isExpanded={expandedFolders.has(folder.id)}
+                  onToggle={() => toggleFolder(folder.id)}
+                  onEdit={() => startEditFolder(folder)}
                 >
-                  {editingList?.id === list.id ? (
+                  {editingFolder?.id === folder.id ? (
                     <div className={styles.editForm}>
                       <input
                         type="text"
-                        placeholder="List name"
-                        value={editListName}
-                        onChange={(e) => setEditListName(e.target.value)}
+                        placeholder="Folder name"
+                        value={editFolderName}
+                        onChange={(e) => setEditFolderName(e.target.value)}
                         className={styles.input}
+                        onClick={(e) => e.stopPropagation()}
                       />
                       <div className={styles.buttonGroup}>
                         <button
-                          onClick={saveEditList}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            saveEditFolder()
+                          }}
                           className={`${styles.button} ${styles.buttonPrimary}`}
                         >
                           Save
                         </button>
                         <button
-                          onClick={cancelEdit}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            cancelEditFolder()
+                          }}
                           className={`${styles.button} ${styles.buttonSecondary}`}
                         >
                           Cancel
@@ -675,33 +1121,51 @@ const WishListPage: React.FC = () => {
                       </div>
                     </div>
                   ) : (
-                    <div className={styles.listItemContent} onClick={() => setSelectedList(list)}>
-                      <div className={styles.listItemHeader}>
-                        <span className={styles.listItemName}>{list.name}</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            startEditList(list)
-                          }}
-                          className={styles.editListButton}
-                          title="Edit list name"
+                    <div className={styles.folderContent}>
+                      <SortableContext items={wishLists.filter(list => list.folder_id === folder.id).map(l => l.id)}>
+                      {wishLists.filter(list => list.folder_id === folder.id).map(list => (
+                        <DraggableList
+                          key={list.id}
+                          list={list}
+                          onClick={() => setSelectedList(list)}
+                          isSelected={selectedList?.id === list.id}
                         >
-                          <Edit2 className={styles.editButtonIcon} />
-                        </button>
-                      </div>
-                      <p className={styles.listItemDate}>
-                        Created {new Date(list.created_at).toLocaleDateString()}
-                      </p>
+                          {renderListItemContent(list)}
+                        </DraggableList>
+                      ))}
+                      </SortableContext>
+                      {wishLists.filter(list => list.folder_id === folder.id).length === 0 && (
+                        <p className={styles.emptyFolder}>No lists in this folder</p>
+                      )}
                     </div>
                   )}
-                </div>
+                </DroppableFolder>
               ))}
+              </SortableContext>
+              
+              <DroppableAvailableLists>
+              {/* Uncategorized Lists */}
+              <SortableContext items={wishLists.filter(list => !list.folder_id).map(l => l.id)}>
+              {wishLists.filter(list => !list.folder_id).map(list => (
+                <DraggableList
+                  key={list.id}
+                  list={list}
+                  onClick={() => setSelectedList(list)}
+                  isSelected={selectedList?.id === list.id}
+                >
+                  {renderListItemContent(list)}
+                </DraggableList>
+              ))}
+              </SortableContext>
+              </DroppableAvailableLists>
+
               {wishLists.length === 0 && (
                 <div className={styles.emptyState}>
                   <Gift className={styles.emptyStateIcon} />
                   <p>No wish lists available yet</p>
                 </div>
               )}
+              </DndContext>
             </div>
           </div>
 

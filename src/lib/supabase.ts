@@ -5,9 +5,18 @@ const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY!
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
+export interface ListFolder {
+  id: string
+  name: string
+  created_at: string
+  updated_at: string
+}
+
 export interface WishList {
   id: string
   name: string
+  is_christmas: boolean
+  folder_id: string | null
   created_at: string
   updated_at: string
 }

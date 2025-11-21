@@ -746,3 +746,142 @@
   margin-top: 1rem;
   color: #6b7280;
 }
+
+.headerActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.iconButton {
+  padding: 0.5rem;
+}
+
+.formRow {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+  align-items: center;
+}
+
+.select {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  outline: none;
+  background-color: white;
+}
+
+.select:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+  accent-color: #ef4444;
+}
+
+.checkboxText {
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+
+.folderContainer {
+  margin-bottom: 0.5rem;
+}
+
+.folderHeader {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem;
+  cursor: pointer;
+  border-radius: 0.375rem;
+  color: #4b5563;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.folderHeader:hover {
+  background-color: #f3f4f6;
+  color: #111827;
+}
+
+.folderTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+
+.folderIcon {
+  height: 1rem;
+  width: 1rem;
+}
+
+.folderHeaderOver {
+  background-color: #dbeafe;
+  color: #111827;
+  border: 2px dashed #3b82f6;
+}
+
+.folderContent {
+  margin-left: 1rem;
+  padding-left: 1rem;
+  border-left: 2px solid #e5e7eb;
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.emptyFolder {
+  font-size: 0.875rem;
+  color: #9ca3af;
+  padding: 0.5rem;
+  font-style: italic;
+}
+
+.christmasIcon {
+  color: #ef4444;
+  margin-left: 0.5rem;
+  height: 1rem;
+  width: 1rem;
+  vertical-align: middle;
+  display: inline-block;
+}
+
+.availableListsArea {
+  border: 2px dashed #d1d5db;
+  border-radius: 0.375rem;
+  padding: 0.5rem;
+  transition: all 0.2s;
+}
+
+.availableListsAreaOver {
+  background-color: #f0fdf4;
+  border-color: #22c55e;
+}
+
+.availableListsHeader {
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.availableListsTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
