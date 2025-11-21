@@ -244,7 +244,6 @@ const AdminPage: React.FC = () => {
   const [selectedList, setSelectedList] = useState<WishList | null>(null)
   const [wishItems, setWishItems] = useState<WishItem[]>([])
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
-  const [activeListId, setActiveListId] = useState<string | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -399,15 +398,14 @@ const AdminPage: React.FC = () => {
   }
 
   const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event
-    if (active.data.current?.type === 'list') {
-      setActiveListId(active.id as string)
+    // Track drag start for potential visual feedback
+    if (event.active.data.current?.type === 'list') {
+      // List drag started
     }
   }
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
-    setActiveListId(null)
 
     if (!over) return
 

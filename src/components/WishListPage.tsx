@@ -12,7 +12,6 @@ import {
   useSensors,
   DragEndEvent,
   DragStartEvent,
-  DragOverEvent,
 } from '@dnd-kit/core'
 import {
   arrayMove,
@@ -744,17 +743,15 @@ const WishListPage: React.FC = () => {
     }
   }
 
-  const [activeListId, setActiveListId] = useState<string | null>(null)
-
   const handleDragStart = (event: DragStartEvent) => {
+    // Track drag start for potential visual feedback
     if (event.active.data.current?.type === 'list') {
-      setActiveListId(event.active.id as string)
+      // List drag started
     }
   }
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
-    setActiveListId(null)
 
     if (!over) return
 
