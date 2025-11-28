@@ -34,8 +34,10 @@ interface SortableItemProps {
   isEditing: boolean
   editName: string
   editLink: string
+  editDetails: string
   onEditNameChange: (value: string) => void
   onEditLinkChange: (value: string) => void
+  onEditDetailsChange: (value: string) => void
   onSaveEdit: () => void
   onCancelEdit: () => void
   isMoving: boolean
@@ -51,8 +53,10 @@ const SortableItem: React.FC<SortableItemProps> = ({
   isEditing,
   editName,
   editLink,
+  editDetails,
   onEditNameChange,
   onEditLinkChange,
+  onEditDetailsChange,
   onSaveEdit,
   onCancelEdit,
   isMoving
@@ -95,6 +99,13 @@ const SortableItem: React.FC<SortableItemProps> = ({
               onChange={(e) => onEditLinkChange(e.target.value)}
               className={styles.input}
             />
+            <input
+              type="text"
+              placeholder="Details (size, color, etc.)"
+              value={editDetails}
+              onChange={(e) => onEditDetailsChange(e.target.value)}
+              className={styles.input}
+            />
             <div className={styles.buttonGroup}>
               <button
                 onClick={onSaveEdit}
@@ -125,6 +136,11 @@ const SortableItem: React.FC<SortableItemProps> = ({
                 <h3 className={`${styles.itemName} ${item.is_bought ? styles.itemNameBought : styles.itemNameUnbought}`}>
                   {item.name}
                 </h3>
+                {item.details && (
+                  <p className={styles.itemDetails}>
+                    {item.details}
+                  </p>
+                )}
                 {item.link && (
                   <a
                     href={item.link}
@@ -311,6 +327,7 @@ const WishListPage: React.FC = () => {
   const [newListFolderId, setNewListFolderId] = useState<string>('')
   const [newItemName, setNewItemName] = useState('')
   const [newItemLink, setNewItemLink] = useState('')
+  const [newItemDetails, setNewItemDetails] = useState('')
   const [hasShownDragTip, setHasShownDragTip] = useState(false)
   const [editingItem, setEditingItem] = useState<WishItem | null>(null)
   const [editingList, setEditingList] = useState<WishList | null>(null)
@@ -318,6 +335,7 @@ const WishListPage: React.FC = () => {
   const [editFolderName, setEditFolderName] = useState('')
   const [editItemName, setEditItemName] = useState('')
   const [editItemLink, setEditItemLink] = useState('')
+  const [editItemDetails, setEditItemDetails] = useState('')
   const [editListName, setEditListName] = useState('')
   const [editListIsChristmas, setEditListIsChristmas] = useState(false)
   const [editListFolderId, setEditListFolderId] = useState<string>('')
@@ -508,6 +526,7 @@ const WishListPage: React.FC = () => {
           wish_list_id: selectedList.id,
           name: newItemName.trim(),
           link: newItemLink.trim() || null,
+          details: newItemDetails.trim() || null,
           priority: wishItems.length
         }])
         .select()
@@ -516,6 +535,7 @@ const WishListPage: React.FC = () => {
       setWishItems([data[0], ...wishItems])
       setNewItemName('')
       setNewItemLink('')
+      setNewItemDetails('')
       setShowAddItem(false)
 
       // Show drag-and-drop tip toast for the first item added
@@ -579,6 +599,7 @@ const WishListPage: React.FC = () => {
     setEditingItem(item)
     setEditItemName(item.name)
     setEditItemLink(item.link || '')
+    setEditItemDetails(item.details || '')
   }
 
   const startEditList = (list: WishList) => {
@@ -596,7 +617,8 @@ const WishListPage: React.FC = () => {
         .from('wish_items')
         .update({
           name: editItemName.trim(),
-          link: editItemLink.trim() || null
+          link: editItemLink.trim() || null,
+          details: editItemDetails.trim() || null
         })
         .eq('id', editingItem.id)
 
@@ -605,13 +627,14 @@ const WishListPage: React.FC = () => {
       // Update local state
       setWishItems(wishItems.map(item => 
         item.id === editingItem.id 
-          ? { ...item, name: editItemName.trim(), link: editItemLink.trim() || null }
+          ? { ...item, name: editItemName.trim(), link: editItemLink.trim() || null, details: editItemDetails.trim() || null }
           : item
       ))
 
       setEditingItem(null)
       setEditItemName('')
       setEditItemLink('')
+      setEditItemDetails('')
     } catch (error) {
       console.error('Error updating wish item:', error)
     }
@@ -658,6 +681,7 @@ const WishListPage: React.FC = () => {
     setEditingList(null)
     setEditItemName('')
     setEditItemLink('')
+    setEditItemDetails('')
     setEditListName('')
     setEditListIsChristmas(false)
     setEditListFolderId('')
@@ -1217,6 +1241,13 @@ const WishListPage: React.FC = () => {
                   onChange={(e) => setNewItemLink(e.target.value)}
                   className={styles.input}
                 />
+                <input
+                  type="text"
+                  placeholder="Details (size, color, etc.)"
+                  value={newItemDetails}
+                  onChange={(e) => setNewItemDetails(e.target.value)}
+                  className={styles.input}
+                />
                 <div className={styles.buttonGroup}>
                   <button
                     onClick={addWishItem}
@@ -1225,11 +1256,12 @@ const WishListPage: React.FC = () => {
                   >
                     Add
                   </button>
-                  <button
+                      <button
                     onClick={() => {
                       setShowAddItem(false)
                       setNewItemName('')
                       setNewItemLink('')
+                      setNewItemDetails('')
                     }}
                     className={`${styles.button} ${styles.buttonSecondary}`}
                   >
@@ -1263,8 +1295,10 @@ const WishListPage: React.FC = () => {
                         isEditing={editingItem?.id === item.id}
                         editName={editItemName}
                         editLink={editItemLink}
+                        editDetails={editItemDetails}
                         onEditNameChange={setEditItemName}
                         onEditLinkChange={setEditItemLink}
+                        onEditDetailsChange={setEditItemDetails}
                         onSaveEdit={saveEditItem}
                         onCancelEdit={cancelEdit}
                         isMoving={movingItemId === item.id}

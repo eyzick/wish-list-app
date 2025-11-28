@@ -26,6 +26,7 @@ export interface WishItem {
   wish_list_id: string
   name: string
   link: string | null
+  details: string | null
   is_bought: boolean
   starred: boolean
   priority: number

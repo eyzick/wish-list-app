@@ -456,6 +456,12 @@
   color: #111827;
 }
 
+.itemDetails {
+  color: #6b7280;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
 .itemLink {
   color: #2563eb;
   font-size: 0.875rem;
