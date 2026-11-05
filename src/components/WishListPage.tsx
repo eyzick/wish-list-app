@@ -1,5 +1,8 @@
-import React, { useState, useEffect } from 'react'
-import { supabase, WishList, WishItem, ListFolder } from '../lib/supabase'
+import React, { useState, useEffect, useRef, useId } from 'react'
+import { supabase, WishList, WishItem, ListFolder, withPurchaseStatus } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
+import { canTrackPurchases } from '../lib/purchaseVisibility'
+import { formatPrice, parsePrice, sortByPriceLowToHigh } from '../lib/pricing'
 import { ExternalLink, Check, ShoppingCart, Gift, Plus, GripVertical, Edit2, ChevronUp, ChevronDown, Star, Folder, FolderPlus, CandyCane } from 'lucide-react'
 import toast, { Toaster } from 'react-hot-toast'
 import styles from '../styles/WishListPage.module.css'
@@ -26,6 +29,8 @@ import { CSS } from '@dnd-kit/utilities'
 
 interface SortableItemProps {
   item: WishItem
+  hidePurchaseStatus: boolean
+  allowReorder: boolean
   onToggleBought: (item: WishItem) => void
   onEdit: (item: WishItem) => void
   onMoveUp: (item: WishItem) => void
@@ -35,16 +40,80 @@ interface SortableItemProps {
   editName: string
   editLink: string
   editDetails: string
+  editPrice: string
   onEditNameChange: (value: string) => void
   onEditLinkChange: (value: string) => void
   onEditDetailsChange: (value: string) => void
+  onEditPriceChange: (value: string) => void
   onSaveEdit: () => void
   onCancelEdit: () => void
   isMoving: boolean
 }
 
+interface FolderPickerProps {
+  folders: ListFolder[]
+  value: string
+  onChange: (value: string) => void
+}
+
+const FolderPicker: React.FC<FolderPickerProps> = ({ folders, value, onChange }) => {
+  const [open, setOpen] = useState(false)
+  const pickerRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuId = useId()
+  const selectedFolder = folders.find(folder => folder.id === value)
+
+  useEffect(() => {
+    if (!open) return
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!pickerRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    return () => document.removeEventListener('pointerdown', closeOnOutsideClick)
+  }, [open])
+
+  return <div className={styles.folderPicker} ref={pickerRef} onKeyDown={(event) => {
+    if (event.key === 'Escape') {
+      setOpen(false)
+      triggerRef.current?.focus()
+    }
+  }}>
+    <span className={styles.fieldLabel}>Folder</span>
+    <button
+      ref={triggerRef}
+      type="button"
+      className={`${styles.folderPickerTrigger} ${open ? styles.folderPickerTriggerOpen : ''}`}
+      aria-label={`Folder: ${selectedFolder?.name || 'No folder'}. Choose folder`}
+      aria-expanded={open}
+      aria-controls={menuId}
+      onClick={() => setOpen(current => !current)}
+    >
+      <span className={styles.folderPickerIcon}><Folder size={18} /></span>
+      <span className={styles.folderPickerValue}>{selectedFolder?.name || 'No folder'}</span>
+      <ChevronDown className={`${styles.folderPickerChevron} ${open ? styles.folderPickerChevronOpen : ''}`} size={18} />
+    </button>
+    {open && <div id={menuId} className={styles.folderPickerOptions}>
+      <button type="button" className={styles.folderPickerOption} aria-pressed={!value}
+        onClick={() => { onChange(''); setOpen(false); triggerRef.current?.focus() }}>
+        <span className={styles.folderPickerOptionIcon}><Gift size={17} /></span>
+        <span className={styles.folderPickerOptionText}><strong>No folder</strong><small>Keep in your main lists</small></span>
+        {!value && <Check size={18} className={styles.folderPickerCheck} />}
+      </button>
+      {folders.map(folder => <button key={folder.id} type="button" className={styles.folderPickerOption}
+        aria-pressed={value === folder.id}
+        onClick={() => { onChange(folder.id); setOpen(false); triggerRef.current?.focus() }}>
+        <span className={styles.folderPickerOptionIcon}><Folder size={17} /></span>
+        <span className={styles.folderPickerOptionText}><strong>{folder.name}</strong></span>
+        {value === folder.id && <Check size={18} className={styles.folderPickerCheck} />}
+      </button>)}
+    </div>}
+  </div>
+}
+
 const SortableItem: React.FC<SortableItemProps> = ({ 
   item, 
+  hidePurchaseStatus,
+  allowReorder,
   onToggleBought, 
   onEdit, 
   onMoveUp,
@@ -54,9 +123,11 @@ const SortableItem: React.FC<SortableItemProps> = ({
   editName,
   editLink,
   editDetails,
+  editPrice,
   onEditNameChange,
   onEditLinkChange,
   onEditDetailsChange,
+  onEditPriceChange,
   onSaveEdit,
   onCancelEdit,
   isMoving
@@ -68,7 +139,7 @@ const SortableItem: React.FC<SortableItemProps> = ({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: item.id })
+  } = useSortable({ id: item.id, disabled: !allowReorder })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -88,6 +159,7 @@ const SortableItem: React.FC<SortableItemProps> = ({
             <input
               type="text"
               placeholder="Item name"
+              aria-label="Item name"
               value={editName}
               onChange={(e) => onEditNameChange(e.target.value)}
               className={styles.input}
@@ -95,6 +167,7 @@ const SortableItem: React.FC<SortableItemProps> = ({
             <input
               type="url"
               placeholder="Item link (optional)"
+              aria-label="Item link"
               value={editLink}
               onChange={(e) => onEditLinkChange(e.target.value)}
               className={styles.input}
@@ -102,8 +175,20 @@ const SortableItem: React.FC<SortableItemProps> = ({
             <input
               type="text"
               placeholder="Details (size, color, etc.)"
+              aria-label="Item details"
               value={editDetails}
               onChange={(e) => onEditDetailsChange(e.target.value)}
+              className={styles.input}
+            />
+            <input
+              type="number"
+              min="0"
+              max="99999999.99"
+              step="0.01"
+              placeholder="Price in USD (optional)"
+              aria-label="Item price in USD"
+              value={editPrice}
+              onChange={(e) => onEditPriceChange(e.target.value)}
               className={styles.input}
             />
             <div className={styles.buttonGroup}>
@@ -124,14 +209,14 @@ const SortableItem: React.FC<SortableItemProps> = ({
         ) : (
           <div className={styles.itemMain}>
             <div className={styles.itemRow}>
-              <button
+              {allowReorder && <button
                 {...attributes}
                 {...listeners}
                 className={styles.dragHandle}
                 title="Drag to reorder items by priority"
               >
                 <GripVertical className={styles.boughtButtonIcon} />
-              </button>
+              </button>}
               <div className={styles.itemInfo}>
                 <h3 className={`${styles.itemName} ${item.is_bought ? styles.itemNameBought : styles.itemNameUnbought}`}>
                   {item.name}
@@ -140,6 +225,9 @@ const SortableItem: React.FC<SortableItemProps> = ({
                   <p className={styles.itemDetails}>
                     {item.details}
                   </p>
+                )}
+                {item.price !== null && (
+                  <p className={styles.itemPrice}>{formatPrice(item.price)}</p>
                 )}
                 {item.link && (
                   <a
@@ -161,7 +249,7 @@ const SortableItem: React.FC<SortableItemProps> = ({
                 >
                   <Star className={styles.starButtonIcon} />
                 </button>
-                <div className={styles.priorityButtons}>
+                {allowReorder && <div className={styles.priorityButtons}>
                   <button
                     onClick={() => onMoveUp(item)}
                     className={styles.priorityButton}
@@ -176,7 +264,7 @@ const SortableItem: React.FC<SortableItemProps> = ({
                   >
                     <ChevronDown className={styles.priorityButtonIcon} />
                   </button>
-                </div>
+                </div>}
                 <button
                   onClick={() => onEdit(item)}
                   className={styles.editButton}
@@ -184,7 +272,7 @@ const SortableItem: React.FC<SortableItemProps> = ({
                 >
                   <Edit2 className={styles.editButtonIcon} />
                 </button>
-                <button
+                {!hidePurchaseStatus && <button
                   onClick={() => onToggleBought(item)}
                   className={`${styles.boughtButton} ${item.is_bought ? styles.boughtButtonBought : styles.boughtButtonUnbought}`}
                   title={item.is_bought ? 'Click to mark as not bought' : 'Click to mark as bought'}
@@ -200,7 +288,7 @@ const SortableItem: React.FC<SortableItemProps> = ({
                       <span>Mark as Bought</span>
                     </>
                   )}
-                </button>
+                </button>}
               </div>
             </div>
           </div>
@@ -241,12 +329,31 @@ const DraggableList: React.FC<DraggableListProps> = ({ list, onClick, isSelected
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
       className={`${styles.listItem} ${isSelected ? styles.listItemSelected : ''}`}
       onClick={onClick}
+      role="button"
+      tabIndex={0}
+      aria-pressed={isSelected}
+      onKeyDown={(event) => {
+        if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault()
+          onClick()
+        }
+      }}
     >
-      {children}
+      <div className={styles.listRow}>
+        <div className={styles.listBody}>{children}</div>
+        <button
+          {...attributes}
+          {...listeners}
+          type="button"
+          className={styles.listDragHandle}
+          aria-label={`Move ${list.name} to a folder`}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <GripVertical size={18} />
+        </button>
+      </div>
     </div>
   )
 }
@@ -300,19 +407,21 @@ const DroppableFolder: React.FC<DroppableFolderProps> = ({ folder, children, isE
 }
 
 const DroppableAvailableLists: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { setNodeRef } = useSortable({ 
+  const { setNodeRef, isOver } = useSortable({
     id: 'available-lists',
     data: { type: 'available-lists-area' } 
   });
   
   return (
-    <div ref={setNodeRef} className="min-h-[50px]">
+    <div ref={setNodeRef} className={`${styles.availableListsArea} ${isOver ? styles.availableListsAreaOver : ''}`}>
       {children}
     </div>
   );
 };
 
 const WishListPage: React.FC = () => {
+  const { member } = useAuth()
+  const itemsSectionRef = useRef<HTMLDivElement>(null)
   const [wishLists, setWishLists] = useState<WishList[]>([])
   const [folders, setFolders] = useState<ListFolder[]>([])
   const [selectedList, setSelectedList] = useState<WishList | null>(null)
@@ -328,6 +437,7 @@ const WishListPage: React.FC = () => {
   const [newItemName, setNewItemName] = useState('')
   const [newItemLink, setNewItemLink] = useState('')
   const [newItemDetails, setNewItemDetails] = useState('')
+  const [newItemPrice, setNewItemPrice] = useState('')
   const [hasShownDragTip, setHasShownDragTip] = useState(false)
   const [editingItem, setEditingItem] = useState<WishItem | null>(null)
   const [editingList, setEditingList] = useState<WishList | null>(null)
@@ -336,12 +446,22 @@ const WishListPage: React.FC = () => {
   const [editItemName, setEditItemName] = useState('')
   const [editItemLink, setEditItemLink] = useState('')
   const [editItemDetails, setEditItemDetails] = useState('')
+  const [editItemPrice, setEditItemPrice] = useState('')
   const [editListName, setEditListName] = useState('')
   const [editListIsChristmas, setEditListIsChristmas] = useState(false)
   const [editListFolderId, setEditListFolderId] = useState<string>('')
   const [movingItemId, setMovingItemId] = useState<string | null>(null)
   const [excludeBoughtLists, setExcludeBoughtLists] = useState<Set<string>>(new Set())
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
+  const [sortMode, setSortMode] = useState<'priority' | 'price'>('priority')
+  const hidePurchaseStatus = !canTrackPurchases(selectedList?.owner_id ?? null, member?.id)
+
+  const selectList = (list: WishList) => {
+    setSelectedList(list)
+    if (window.matchMedia?.('(max-width: 767px)').matches) {
+      requestAnimationFrame(() => itemsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+    }
+  }
 
   const toggleExcludeBought = (listId: string) => {
     setExcludeBoughtLists(prev => {
@@ -405,6 +525,9 @@ const WishListPage: React.FC = () => {
   const filteredWishItems = selectedList && excludeBoughtLists.has(selectedList.id)
     ? wishItems.filter(item => !item.is_bought)
     : wishItems
+  const displayedWishItems = sortMode === 'price'
+    ? sortByPriceLowToHigh(filteredWishItems)
+    : filteredWishItems
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -448,23 +571,26 @@ const WishListPage: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('wish_items')
-        .select('*')
+        .select('*, wish_item_purchases(is_bought)')
         .eq('wish_list_id', listId)
         .order('priority', { ascending: true })
 
       if (error) throw error
-      setWishItems(data || [])
+      setWishItems(withPurchaseStatus(data || []))
     } catch (error) {
       console.error('Error fetching wish items:', error)
     }
   }
 
   const toggleItemBought = async (item: WishItem) => {
+    if (hidePurchaseStatus) return
     try {
       const { error } = await supabase
-        .from('wish_items')
+        .from('wish_item_purchases')
         .update({ is_bought: !item.is_bought })
-        .eq('id', item.id)
+        .eq('item_id', item.id)
+        .select('item_id')
+        .single()
 
       if (error) throw error
       setWishItems(wishItems.map(i => 
@@ -493,13 +619,14 @@ const WishListPage: React.FC = () => {
   }
 
   const addWishList = async () => {
-    if (!newListName.trim()) return
+    if (!newListName.trim() || !member) return
 
     try {
       const { data, error } = await supabase
         .from('wish_lists')
         .insert([{ 
           name: newListName.trim(),
+          owner_id: member.id,
           is_christmas: newListIsChristmas,
           folder_id: newListFolderId || null
         }])
@@ -518,6 +645,11 @@ const WishListPage: React.FC = () => {
 
   const addWishItem = async () => {
     if (!newItemName.trim() || !selectedList) return
+    const price = parsePrice(newItemPrice)
+    if (price === undefined) {
+      toast.error('Enter a valid price with up to two decimal places.')
+      return
+    }
 
     try {
       const { data, error } = await supabase
@@ -527,15 +659,17 @@ const WishListPage: React.FC = () => {
           name: newItemName.trim(),
           link: newItemLink.trim() || null,
           details: newItemDetails.trim() || null,
+          price,
           priority: wishItems.length
         }])
-        .select()
+        .select('*, wish_item_purchases(is_bought)')
 
       if (error) throw error
-      setWishItems([data[0], ...wishItems])
+      setWishItems([...wishItems, withPurchaseStatus(data)[0]])
       setNewItemName('')
       setNewItemLink('')
       setNewItemDetails('')
+      setNewItemPrice('')
       setShowAddItem(false)
 
       // Show drag-and-drop tip toast for the first item added
@@ -600,6 +734,7 @@ const WishListPage: React.FC = () => {
     setEditItemName(item.name)
     setEditItemLink(item.link || '')
     setEditItemDetails(item.details || '')
+    setEditItemPrice(item.price?.toString() ?? '')
   }
 
   const startEditList = (list: WishList) => {
@@ -611,6 +746,11 @@ const WishListPage: React.FC = () => {
 
   const saveEditItem = async () => {
     if (!editingItem || !editItemName.trim()) return
+    const price = parsePrice(editItemPrice)
+    if (price === undefined) {
+      toast.error('Enter a valid price with up to two decimal places.')
+      return
+    }
 
     try {
       const { error } = await supabase
@@ -618,7 +758,8 @@ const WishListPage: React.FC = () => {
         .update({
           name: editItemName.trim(),
           link: editItemLink.trim() || null,
-          details: editItemDetails.trim() || null
+          details: editItemDetails.trim() || null,
+          price
         })
         .eq('id', editingItem.id)
 
@@ -627,7 +768,7 @@ const WishListPage: React.FC = () => {
       // Update local state
       setWishItems(wishItems.map(item => 
         item.id === editingItem.id 
-          ? { ...item, name: editItemName.trim(), link: editItemLink.trim() || null, details: editItemDetails.trim() || null }
+          ? { ...item, name: editItemName.trim(), link: editItemLink.trim() || null, details: editItemDetails.trim() || null, price }
           : item
       ))
 
@@ -635,6 +776,7 @@ const WishListPage: React.FC = () => {
       setEditItemName('')
       setEditItemLink('')
       setEditItemDetails('')
+      setEditItemPrice('')
     } catch (error) {
       console.error('Error updating wish item:', error)
     }
@@ -682,6 +824,7 @@ const WishListPage: React.FC = () => {
     setEditItemName('')
     setEditItemLink('')
     setEditItemDetails('')
+    setEditItemPrice('')
     setEditListName('')
     setEditListIsChristmas(false)
     setEditListFolderId('')
@@ -839,6 +982,7 @@ const WishListPage: React.FC = () => {
         return
     }
 
+    if (sortMode === 'price') return
     if (over && active.id !== over.id) {
       // Use filtered items for drag indices
       const oldIndex = filteredWishItems.findIndex(item => item.id === active.id)
@@ -887,33 +1031,30 @@ const WishListPage: React.FC = () => {
   const renderListItemContent = (list: WishList) => {
     if (editingList?.id === list.id) {
       return (
-        <div className={styles.editForm}>
+        <div className={styles.editForm} onClick={(event) => event.stopPropagation()}>
+          <p className={styles.formHeading}>Edit list</p>
+          <label className={styles.fieldLabel} htmlFor={`edit-list-${list.id}`}>List name</label>
           <input
+            id={`edit-list-${list.id}`}
             type="text"
             placeholder="List name"
+            aria-label="List name"
             value={editListName}
             onChange={(e) => setEditListName(e.target.value)}
             className={styles.input}
           />
-          <div className={styles.formRow}>
-            <select
-              value={editListFolderId}
-              onChange={(e) => setEditListFolderId(e.target.value)}
-              className={styles.select}
-            >
-              <option value="">No Folder</option>
-              {folders.map(folder => (
-                <option key={folder.id} value={folder.id}>{folder.name}</option>
-              ))}
-            </select>
-            <label className={styles.checkboxLabel}>
+          <div className={styles.listFormOptions}>
+            <FolderPicker folders={folders} value={editListFolderId} onChange={setEditListFolderId} />
+            <label className={styles.listTypeToggle}>
               <input
                 type="checkbox"
                 checked={editListIsChristmas}
                 onChange={(e) => setEditListIsChristmas(e.target.checked)}
-                className={styles.checkbox}
+                className={styles.listTypeCheckbox}
               />
-              <span className={styles.checkboxText}>Christmas List</span>
+              <span className={styles.listTypeIcon}><CandyCane size={18} /></span>
+              <span className={styles.listTypeText}>Christmas list</span>
+              <span className={styles.listTypeSwitch} aria-hidden="true" />
             </label>
           </div>
           <div className={styles.buttonGroup}>
@@ -941,7 +1082,7 @@ const WishListPage: React.FC = () => {
             {list.name}
             {list.is_christmas && (
               <span title="Christmas List">
-                <CandyCane className={`${styles.christmasIcon} text-red-500 ml-2 h-4 w-4 inline`} />
+                <CandyCane className={styles.christmasIcon} />
               </span>
             )}
           </span>
@@ -979,18 +1120,17 @@ const WishListPage: React.FC = () => {
       <Toaster />
       <div className={styles.content}>
         <div className={styles.header}>
-          <div className={styles.iconContainer}>
-            <Gift className={styles.icon} />
-          </div>
           <h1 className={styles.title}>Wish Lists</h1>
-          <p className={styles.subtitle}>Browse and manage your wish lists</p>
+          <p className={styles.subtitle}>Keep ideas, links, and prices in one place.</p>
         </div>
 
         <div className={styles.grid}>
           {/* Wish Lists Section */}
           <div className={styles.card}>
             <div className={styles.cardHeader}>
-              <h2 className={styles.cardTitle}>Available Lists</h2>
+              <div>
+                <h2 className={styles.cardTitle}>Lists <span className={styles.countBadge}>{wishLists.length}</span></h2>
+              </div>
               <div className={styles.headerActions}>
                 <button
                   onClick={() => setShowAddFolder(true)}
@@ -1012,9 +1152,13 @@ const WishListPage: React.FC = () => {
 
             {showAddFolder && (
               <div className={styles.addForm}>
+                <p className={styles.formHeading}>New folder</p>
+                <label className={styles.fieldLabel} htmlFor="new-folder-name">Folder name</label>
                 <input
+                  id="new-folder-name"
                   type="text"
                   placeholder="Folder name"
+                  aria-label="Folder name"
                   value={newFolderName}
                   onChange={(e) => setNewFolderName(e.target.value)}
                   className={styles.input}
@@ -1042,32 +1186,29 @@ const WishListPage: React.FC = () => {
 
             {showAddList && (
               <div className={styles.addForm}>
+                <p className={styles.formHeading}>New list</p>
+                <label className={styles.fieldLabel} htmlFor="new-list-name">List name</label>
                 <input
+                  id="new-list-name"
                   type="text"
                   placeholder="List name"
+                  aria-label="List name"
                   value={newListName}
                   onChange={(e) => setNewListName(e.target.value)}
                   className={styles.input}
                 />
-                <div className={styles.formRow}>
-                  <select
-                    value={newListFolderId}
-                    onChange={(e) => setNewListFolderId(e.target.value)}
-                    className={styles.select}
-                  >
-                    <option value="">No Folder</option>
-                    {folders.map(folder => (
-                      <option key={folder.id} value={folder.id}>{folder.name}</option>
-                    ))}
-                  </select>
-                  <label className={styles.checkboxLabel}>
+                <div className={styles.listFormOptions}>
+                  <FolderPicker folders={folders} value={newListFolderId} onChange={setNewListFolderId} />
+                  <label className={styles.listTypeToggle}>
                     <input
                       type="checkbox"
                       checked={newListIsChristmas}
                       onChange={(e) => setNewListIsChristmas(e.target.checked)}
-                      className={styles.checkbox}
+                      className={styles.listTypeCheckbox}
                     />
-                    <span className={styles.checkboxText}>Christmas List</span>
+                    <span className={styles.listTypeIcon}><CandyCane size={18} /></span>
+                    <span className={styles.listTypeText}>Christmas list</span>
+                    <span className={styles.listTypeSwitch} aria-hidden="true" />
                   </label>
                 </div>
                 <div className={styles.buttonGroup}>
@@ -1076,7 +1217,7 @@ const WishListPage: React.FC = () => {
                     disabled={!newListName.trim()}
                     className={`${styles.button} ${styles.buttonPrimary}`}
                   >
-                    Add
+                    Create list
                   </button>
                   <button
                     onClick={() => {
@@ -1115,6 +1256,7 @@ const WishListPage: React.FC = () => {
                       <input
                         type="text"
                         placeholder="Folder name"
+                        aria-label="Folder name"
                         value={editFolderName}
                         onChange={(e) => setEditFolderName(e.target.value)}
                         className={styles.input}
@@ -1148,7 +1290,7 @@ const WishListPage: React.FC = () => {
                         <DraggableList
                           key={list.id}
                           list={list}
-                          onClick={() => setSelectedList(list)}
+                          onClick={() => selectList(list)}
                           isSelected={selectedList?.id === list.id}
                         >
                           {renderListItemContent(list)}
@@ -1171,7 +1313,7 @@ const WishListPage: React.FC = () => {
                 <DraggableList
                   key={list.id}
                   list={list}
-                  onClick={() => setSelectedList(list)}
+                  onClick={() => selectList(list)}
                   isSelected={selectedList?.id === list.id}
                 >
                   {renderListItemContent(list)}
@@ -1183,7 +1325,9 @@ const WishListPage: React.FC = () => {
               {wishLists.length === 0 && (
                 <div className={styles.emptyState}>
                   <Gift className={styles.emptyStateIcon} />
-                  <p>No wish lists available yet</p>
+                  <strong>Every great gift starts with an idea.</strong>
+                  <p>Create your first list and start collecting wishes.</p>
+                  <button type="button" className={styles.emptyAction} onClick={() => setShowAddList(true)}>Create a list</button>
                 </div>
               )}
               </DndContext>
@@ -1191,14 +1335,26 @@ const WishListPage: React.FC = () => {
           </div>
 
           {/* Wish Items Section */}
-          <div className={styles.card}>
+          <div ref={itemsSectionRef} className={`${styles.card} ${styles.itemsCard}`}>
             <div className={styles.cardHeader}>
-              <h2 className={styles.cardTitle}>
-                {selectedList ? `${selectedList.name} Items` : 'Select a List'}
-              </h2>
+              <div>
+                <h2 className={styles.cardTitle}>
+                  {selectedList ? selectedList.name : 'Choose a list'}
+                </h2>
+              </div>
               {selectedList && (
                 <div className={styles.cardHeaderActions}>
-                  <label className={styles.toggleLabel}>
+                  <label className={styles.sortLabel} htmlFor="item-sort">Sort items</label>
+                  <select
+                    id="item-sort"
+                    value={sortMode}
+                    onChange={(e) => setSortMode(e.target.value as 'priority' | 'price')}
+                    className={styles.sortSelect}
+                  >
+                    <option value="priority">Priority</option>
+                    <option value="price">Price: low to high</option>
+                  </select>
+                  {!hidePurchaseStatus && <label className={styles.toggleLabel}>
                     <input
                       type="checkbox"
                       checked={excludeBoughtLists.has(selectedList.id)}
@@ -1206,7 +1362,7 @@ const WishListPage: React.FC = () => {
                       className={styles.toggleCheckbox}
                     />
                     <span className={styles.toggleText}>Hide bought items</span>
-                  </label>
+                  </label>}
                   <button
                     onClick={() => setShowAddItem(true)}
                     className={styles.addButton}
@@ -1230,6 +1386,7 @@ const WishListPage: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Item name"
+                  aria-label="Item name"
                   value={newItemName}
                   onChange={(e) => setNewItemName(e.target.value)}
                   className={styles.input}
@@ -1237,6 +1394,7 @@ const WishListPage: React.FC = () => {
                 <input
                   type="url"
                   placeholder="Item link (optional)"
+                  aria-label="Item link"
                   value={newItemLink}
                   onChange={(e) => setNewItemLink(e.target.value)}
                   className={styles.input}
@@ -1244,8 +1402,20 @@ const WishListPage: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Details (size, color, etc.)"
+                  aria-label="Item details"
                   value={newItemDetails}
                   onChange={(e) => setNewItemDetails(e.target.value)}
+                  className={styles.input}
+                />
+                <input
+                  type="number"
+                  min="0"
+                  max="99999999.99"
+                  step="0.01"
+                  placeholder="Price in USD (optional)"
+                  aria-label="Item price in USD"
+                  value={newItemPrice}
+                  onChange={(e) => setNewItemPrice(e.target.value)}
                   className={styles.input}
                 />
                 <div className={styles.buttonGroup}>
@@ -1262,6 +1432,7 @@ const WishListPage: React.FC = () => {
                       setNewItemName('')
                       setNewItemLink('')
                       setNewItemDetails('')
+                      setNewItemPrice('')
                     }}
                     className={`${styles.button} ${styles.buttonSecondary}`}
                   >
@@ -1279,14 +1450,16 @@ const WishListPage: React.FC = () => {
                   onDragEnd={handleDragEnd}
                 >
                   <SortableContext
-                    items={filteredWishItems.map(item => item.id)}
+                    items={displayedWishItems.map(item => item.id)}
                     strategy={verticalListSortingStrategy}
                   >
                     <div className={styles.itemContainer}>
-                      {filteredWishItems.map((item) => (
+                      {displayedWishItems.map((item) => (
                       <SortableItem
                         key={item.id}
                         item={item}
+                        hidePurchaseStatus={hidePurchaseStatus}
+                        allowReorder={sortMode === 'priority'}
                         onToggleBought={toggleItemBought}
                         onEdit={startEditItem}
                         onMoveUp={moveItemUp}
@@ -1296,19 +1469,21 @@ const WishListPage: React.FC = () => {
                         editName={editItemName}
                         editLink={editItemLink}
                         editDetails={editItemDetails}
+                        editPrice={editItemPrice}
                         onEditNameChange={setEditItemName}
                         onEditLinkChange={setEditItemLink}
                         onEditDetailsChange={setEditItemDetails}
+                        onEditPriceChange={setEditItemPrice}
                         onSaveEdit={saveEditItem}
                         onCancelEdit={cancelEdit}
                         isMoving={movingItemId === item.id}
                       />
                       ))}
-                      {filteredWishItems.length === 0 && (
+                      {displayedWishItems.length === 0 && (
                         <div className={styles.emptyState}>
                           <GripVertical className={styles.emptyStateIcon} />
                           <p>No items in this list yet</p>
-                          <p className={styles.emptyStateText}>Add items and drag to reorder by priority</p>
+                          <p className={styles.emptyStateText}>Add items to this list</p>
                         </div>
                       )}
                     </div>
@@ -1316,7 +1491,9 @@ const WishListPage: React.FC = () => {
                 </DndContext>
 
                 {/* Summary */}
-                <div className={styles.summaryCard}>
+                {hidePurchaseStatus
+                  ? <p className={styles.emptyStateText}>Purchase tracking is hidden for this list.</p>
+                  : <div className={styles.summaryCard}>
                   <h3 className={styles.summaryTitle}>Summary</h3>
                   <div className={styles.summaryGrid}>
                     <div className={`${styles.summaryItem} ${styles.summaryItemTotal}`}>
@@ -1336,7 +1513,7 @@ const WishListPage: React.FC = () => {
                       <div className={`${styles.summaryLabel} ${styles.summaryLabelRemaining}`}>Remaining</div>
                     </div>
                   </div>
-                </div>
+                </div>}
               </>
             )}
           </div>

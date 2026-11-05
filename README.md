@@ -1,44 +1,22 @@
-# Wish List App
+# Wish Lists
 
-A simple wish list application built with React, TypeScript, and Supabase. Create and manage multiple wish lists with items that can be marked as bought or unbought.
+React, TypeScript, and Supabase wish lists for a small group. Every member signs in with their own email and password. Items can have optional prices and be viewed from low to high. Members can see purchase tracking on other people's lists, while the owner cannot see it, including in Supabase API responses. Admins can delete lists, folders, and items.
 
-## Features
+## Set up Supabase
 
-- **Multiple Wish Lists**: Create and manage multiple wish lists
-- **Item Management**: Add items with names and optional links
-- **Bought Status**: Mark items as bought or unbought
-- **Priority Ordering**: Drag and drop items to reorder by priority
-- **Admin Panel**: Password-protected admin interface for deleting lists/items
-- **Responsive Design**: Works on desktop and mobile devices
+1. For a new Supabase project, run `supabase-schema.sql` in the SQL editor. If the earlier wish-list schema is already installed, run `supabase-signup-upgrade.sql` instead. Run either script once.
+2. In **Authentication → Sign In / Providers**, enable email/password and **Allow new users to sign up**. Email confirmation is optional. If enabled, add `http://localhost:3001`, `http://127.0.0.1:3001`, and the deployed app URL to **Authentication → URL Configuration → Redirect URLs** so confirmation links return to the app.
+3. Set `REACT_APP_SUPABASE_URL` and `REACT_APP_SUPABASE_ANON_KEY` in a local `.env.local` and as GitHub Actions secrets for deployment. Run `npm ci` and `npm start` locally.
+4. Open the app and choose **Create account**. Each person creates their own account. The first account becomes an admin and can delete lists, folders, and items. Later accounts are regular members. If email confirmation is enabled, opening the confirmation link signs the person in automatically in the browser that opens it. Browser sessions are separate, so confirming in another browser does not sign in the original browser tab.
 
-## How It Works
+Use only the public Supabase anon key in React environment variables. The old `REACT_APP_ADMIN_PASSWORD` is no longer used. With open sign-up, anyone who has the app URL can create an account and view wish lists.
 
-### Public Interface
-- View all available wish lists on the home page
-- Click on any list to view its items
-- Click the checkmark/X icon to toggle bought status
-- Click "View Link" to open item URLs in a new tab
-- Drag items by the grip handle to reorder by priority
+## How purchase privacy works
 
-### Admin Interface
-- Navigate to `/admin` and enter your admin password
-- Delete entire lists or individual items
-- Drag and drop items to reorder by priority
+Purchase status lives in `wish_item_purchases`, separate from item names, prices, and links. Row Level Security only lets a signed-in member read or update that status when the list belongs to someone else. The list owner can still view and edit their items, but cannot see purchase buttons or totals.
 
-## Tech Stack
+Database policies also limit list and item deletion to admins. All signed-in members can add and edit lists and items; only the creator can own a newly created list.
 
-- **Frontend**: React 18 with TypeScript
-- **Styling**: CSS Modules
-- **Backend**: Supabase (PostgreSQL database)
-- **Authentication**: Environment variable-based admin password
-- **Icons**: Lucide React
-- **Routing**: React Router DOM
-- **Drag & Drop**: @dnd-kit
-- **Notifications**: React Hot Toast
+## Prices and sorting
 
-## Database Schema
-
-- **wish_lists**: Stores wish list information (id, name, timestamps)
-- **wish_items**: Stores individual items (id, wish_list_id, name, link, is_bought, priority, timestamps)
-
-Row Level Security (RLS) is enabled with public read access and admin-only delete access.
+Item prices are optional USD amounts with up to two decimal places. In a list, choose **Price: low to high** from **Sort items** to see priced items in ascending order; items without a price appear last. Choose **Priority** to return to the saved manual order. Dragging and priority controls are available only in Priority view.

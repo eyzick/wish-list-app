@@ -14,11 +14,11 @@ function App() {
         <div className={styles.container}>
           <Navigation />
           <Routes>
-            <Route path="/" element={<WishListPage />} />
+            <Route path="/" element={<ProtectedRoute><WishListPage /></ProtectedRoute>} />
             <Route 
               path="/admin" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute adminOnly>
                   <AdminPage />
                 </ProtectedRoute>
               } 

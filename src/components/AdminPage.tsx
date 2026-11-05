@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { supabase, WishList, WishItem, ListFolder } from '../lib/supabase'
+import { supabase, WishList, WishItem, ListFolder, withPurchaseStatus } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
+import { canTrackPurchases } from '../lib/purchaseVisibility'
+import { formatPrice } from '../lib/pricing'
 import { Trash2, ExternalLink, Check, ShoppingCart, GripVertical, Folder, ChevronDown, ChevronUp, CandyCane } from 'lucide-react'
 import styles from '../styles/AdminPage.module.css'
 import {
@@ -25,11 +28,12 @@ import { CSS } from '@dnd-kit/utilities'
 
 interface AdminSortableItemProps {
   item: WishItem
+  hidePurchaseStatus: boolean
   onToggleBought: (item: WishItem) => void
   onDelete: (id: string) => void
 }
 
-const AdminSortableItem: React.FC<AdminSortableItemProps> = ({ item, onToggleBought, onDelete }) => {
+const AdminSortableItem: React.FC<AdminSortableItemProps> = ({ item, hidePurchaseStatus, onToggleBought, onDelete }) => {
   const {
     attributes,
     listeners,
@@ -66,6 +70,7 @@ const AdminSortableItem: React.FC<AdminSortableItemProps> = ({ item, onToggleBou
               <span className={`${styles.itemName} ${item.is_bought ? styles.itemNameBought : styles.itemNameUnbought}`}>
                 {item.name}
               </span>
+              {item.price !== null && <span className={styles.itemPrice}>{formatPrice(item.price)}</span>}
               {item.link && (
                 <a
                   href={item.link}
@@ -78,7 +83,7 @@ const AdminSortableItem: React.FC<AdminSortableItemProps> = ({ item, onToggleBou
                 </a>
               )}
             </div>
-            <button
+            {!hidePurchaseStatus && <button
               onClick={() => onToggleBought(item)}
               className={`${styles.boughtButton} ${item.is_bought ? styles.boughtButtonBought : styles.boughtButtonUnbought}`}
               title={item.is_bought ? 'Click to mark as not bought' : 'Click to mark as bought'}
@@ -94,7 +99,7 @@ const AdminSortableItem: React.FC<AdminSortableItemProps> = ({ item, onToggleBou
                   <span>Mark as Bought</span>
                 </>
               )}
-            </button>
+            </button>}
           </div>
         </div>
         <button
@@ -190,11 +195,19 @@ const DraggableList: React.FC<DraggableListProps> = ({ list, isSelected, onClick
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
       className={`${styles.listItem} ${isSelected ? styles.listItemSelected : ''}`}
       onClick={onClick}
+      role="button"
+      tabIndex={0}
+      aria-pressed={isSelected}
+      onKeyDown={(event) => {
+        if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault()
+          onClick()
+        }
+      }}
     >
+      <div className={styles.listRow}>
       <div className={styles.listItemContent}>
         <div className={styles.listItemNameContainer}>
           {list.is_christmas && (
@@ -214,6 +227,17 @@ const DraggableList: React.FC<DraggableListProps> = ({ list, isSelected, onClick
         >
           <Trash2 className={styles.deleteButtonIcon} />
         </button>
+      </div>
+      <button
+        {...attributes}
+        {...listeners}
+        type="button"
+        className={styles.listDragHandle}
+        aria-label={`Move ${list.name} to a folder`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <GripVertical size={18} />
+      </button>
       </div>
     </div>
   )
@@ -239,11 +263,13 @@ const DroppableAvailableLists: React.FC<DroppableAvailableListsProps> = ({ child
 }
 
 const AdminPage: React.FC = () => {
+  const { member } = useAuth()
   const [wishLists, setWishLists] = useState<WishList[]>([])
   const [folders, setFolders] = useState<ListFolder[]>([])
   const [selectedList, setSelectedList] = useState<WishList | null>(null)
   const [wishItems, setWishItems] = useState<WishItem[]>([])
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
+  const hidePurchaseStatus = !canTrackPurchases(selectedList?.owner_id ?? null, member?.id)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -299,12 +325,12 @@ const AdminPage: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('wish_items')
-        .select('*')
+        .select('*, wish_item_purchases(is_bought)')
         .eq('wish_list_id', listId)
         .order('priority', { ascending: true })
 
       if (error) throw error
-      setWishItems(data || [])
+      setWishItems(withPurchaseStatus(data || []))
     } catch (error) {
       console.error('Error fetching wish items:', error)
     }
@@ -366,11 +392,14 @@ const AdminPage: React.FC = () => {
   }
 
   const toggleItemBought = async (item: WishItem) => {
+    if (hidePurchaseStatus) return
     try {
       const { error } = await supabase
-        .from('wish_items')
+        .from('wish_item_purchases')
         .update({ is_bought: !item.is_bought })
-        .eq('id', item.id)
+        .eq('item_id', item.id)
+        .select('item_id')
+        .single()
 
       if (error) throw error
       setWishItems(wishItems.map(i => 
@@ -503,8 +532,8 @@ const AdminPage: React.FC = () => {
     <div className={styles.container}>
       <div className={styles.content}>
         <div className={styles.header}>
-          <h1 className={styles.title}>Admin Panel</h1>
-          <p className={styles.subtitle}>Delete wish lists, folders, and items • Drag lists into/out of folders • Drag items to reorder by priority</p>
+          <h1 className={styles.title}>Admin</h1>
+          <p className={styles.subtitle}>Manage lists, folders, and items.</p>
         </div>
 
         <DndContext
@@ -602,6 +631,7 @@ const AdminPage: React.FC = () => {
                         <AdminSortableItem
                           key={item.id}
                           item={item}
+                          hidePurchaseStatus={hidePurchaseStatus}
                           onToggleBought={toggleItemBought}
                           onDelete={deleteWishItem}
                         />

@@ -1,105 +1,71 @@
-/* Navigation.module.css */
-
 .nav {
-  background-color: white;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  border-bottom: 1px solid #e5e7eb;
+  position: relative;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 3px 14px rgba(26, 69, 132, 0.03);
 }
-
-.content {
-  max-width: 80rem;
-  margin: 0 auto;
-  padding: 0 1rem;
-}
-
-.container {
-  display: flex;
-  justify-content: space-between;
-  height: 4rem;
-}
-
-.left {
-  display: flex;
-  align-items: center;
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  text-decoration: none;
-}
-
+.content { max-width: 82rem; margin: 0 auto; padding: 0 1.5rem; }
+.container { min-height: 4.75rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.left, .right, .navLinks, .account { display: flex; align-items: center; }
+.right { gap: 1.5rem; }
+.navLinks { gap: 0.3rem; }
+.account { gap: 0.7rem; padding-left: 1.3rem; border-left: 1px solid var(--line); }
+.logo { display: inline-flex; align-items: center; gap: 0.75rem; text-decoration: none; white-space: nowrap; }
 .logoIcon {
-  height: 2rem;
-  width: 2rem;
-  color: #2563eb;
-  margin-right: 0.5rem;
+  width: 2.55rem;
+  height: 2.55rem;
+  padding: 0.55rem;
+  color: white;
+  background: var(--blue);
+  border-radius: 0.85rem;
+  transform: rotate(-8deg);
+  box-shadow: 0 5px 13px rgba(40, 105, 210, 0.2);
 }
-
-.logoText {
-  font-size: 1.25rem;
+.logoText { color: var(--ink); font-family: ui-sans-serif, system-ui, sans-serif; font-size: 1.3rem; font-weight: 800; letter-spacing: -0.045em; }
+.navLink, .logoutButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 2.75rem;
+  padding: 0.55rem 0.85rem;
+  border-radius: 0.8rem;
+  font-size: 0.875rem;
   font-weight: 700;
-  color: #111827;
-}
-
-.right {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.navLink {
-  display: flex;
-  align-items: center;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  transition: all 0.2s;
   text-decoration: none;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
 }
-
-.navLinkActive {
-  background-color: #dbeafe;
-  color: #1e40af;
+.navLink:hover, .logoutButton:hover { transform: translateY(-1px); }
+.navLinkActive { color: var(--blue-dark); background: var(--blue-soft); }
+.navLinkInactive { color: var(--muted); }
+.navLinkInactive:hover, .logoutButton:hover { color: var(--ink); background: var(--blue-soft); }
+.navLinkIcon, .logoutButtonIcon { width: 1.05rem; height: 1.05rem; flex-shrink: 0; }
+.memberAvatar {
+  display: grid;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  background: var(--mint);
+  color: #285d49;
+  font-weight: 800;
 }
+.memberName { max-width: 8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-size: 0.875rem; font-weight: 700; }
+.logoutButton { border: 0; background: transparent; color: var(--muted); }
 
-.navLinkInactive {
-  color: #6b7280;
+@media (max-width: 720px) {
+  .content { padding: 0 1rem; }
+  .container { min-height: 0; flex-wrap: wrap; gap: 0; padding: 0.65rem 0 0.4rem; }
+  .left { width: 100%; justify-content: center; padding-bottom: 0.55rem; }
+  .right { width: 100%; justify-content: space-between; gap: 0.5rem; border-top: 1px solid var(--line); padding-top: 0.35rem; }
+  .account { padding-left: 0; border-left: 0; gap: 0.3rem; }
+  .memberName { display: none; }
+  .navLink, .logoutButton { min-height: 2.75rem; padding: 0.5rem 0.65rem; }
+  .navLinkIcon, .logoutButtonIcon { width: 1.1rem; height: 1.1rem; }
+  .logoutButton span { display: none; }
 }
-
-.navLinkInactive:hover {
-  color: #111827;
-  background-color: #f3f4f6;
-}
-
-.navLinkIcon {
-  height: 1rem;
-  width: 1rem;
-  margin-right: 0.5rem;
-}
-
-.logoutButton {
-  display: flex;
-  align-items: center;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #6b7280;
-  background: none;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.logoutButton:hover {
-  color: #111827;
-  background-color: #f3f4f6;
-}
-
-.logoutButtonIcon {
-  height: 1rem;
-  width: 1rem;
-  margin-right: 0.5rem;
+@media (max-width: 360px) {
+  .logoText { font-size: 1.3rem; }
+  .navLink { padding: 0.45rem 0.5rem; }
 }

@@ -5,7 +5,7 @@ import { Home, Settings, LogOut, Gift } from 'lucide-react'
 import styles from '../styles/Navigation.module.css'
 
 const Navigation: React.FC = () => {
-  const { isAuthenticated, logout } = useAuth()
+  const { member, logout } = useAuth()
   const location = useLocation()
 
   return (
@@ -20,30 +20,38 @@ const Navigation: React.FC = () => {
           </div>
           
           <div className={styles.right}>
-            <Link
+            <div className={styles.navLinks}>
+            {member && <Link
               to="/"
+              aria-label="Home"
               className={`${styles.navLink} ${location.pathname === '/' ? styles.navLinkActive : styles.navLinkInactive}`}
             >
               <Home className={styles.navLinkIcon} />
-              Home
-            </Link>
+              <span>Home</span>
+            </Link>}
             
-            <Link
+            {member?.is_admin && <Link
               to="/admin"
+              aria-label="Admin"
               className={`${styles.navLink} ${location.pathname === '/admin' ? styles.navLinkActive : styles.navLinkInactive}`}
             >
               <Settings className={styles.navLinkIcon} />
-              Admin
-            </Link>
-            
-            {isAuthenticated && (
+              <span>Admin</span>
+            </Link>}
+            </div>
+            {member && (
+              <div className={styles.account}>
+              <span className={styles.memberAvatar} aria-hidden="true">{member.name.charAt(0).toUpperCase()}</span>
+              <span className={styles.memberName}>{member.name}</span>
               <button
-                onClick={logout}
+                onClick={() => { void logout() }}
                 className={styles.logoutButton}
+                aria-label="Log out"
               >
                 <LogOut className={styles.logoutButtonIcon} />
-                Logout
+                <span>Log out</span>
               </button>
+              </div>
             )}
           </div>
         </div>

@@ -1,6 +1,7 @@
-/* App.module.css */
-
 .container {
-  min-height: 100vh;
-  background-color: #f9fafb;
+  min-height: 100svh;
+  background:
+    radial-gradient(circle at 5% 19%, rgba(188, 216, 255, 0.26), transparent 27rem),
+    radial-gradient(circle at 95% 48%, rgba(216, 230, 255, 0.24), transparent 30rem),
+    var(--cream);
 }

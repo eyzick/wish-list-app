@@ -93,15 +93,15 @@
 }
 
 .deleteButton {
-  color: #dc2626;
+  color: var(--blue-dark);
   padding: 0.5rem;
   border-radius: 0.375rem;
   transition: all 0.2s;
 }
 
 .deleteButton:hover {
-  color: #991b1b;
-  background-color: #fef2f2;
+  color: var(--blue-dark);
+  background-color: var(--blue-soft);
 }
 
 .deleteButtonIcon {
@@ -183,6 +183,13 @@
   font-weight: 500;
 }
 
+.itemPrice {
+  color: #374151;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-left: 0.5rem;
+}
+
 .itemNameBought {
   color: #166534;
   text-decoration: line-through;
@@ -249,7 +256,7 @@
 }
 
 .deleteItemButton {
-  color: #dc2626;
+  color: var(--blue-dark);
   margin-left: 0.5rem;
   padding: 0.5rem;
   border-radius: 0.375rem;
@@ -257,8 +264,8 @@
 }
 
 .deleteItemButton:hover {
-  color: #991b1b;
-  background-color: #fef2f2;
+  color: var(--blue-dark);
+  background-color: var(--blue-soft);
 }
 
 .deleteItemButtonIcon {
@@ -352,11 +359,92 @@
 .christmasIcon {
   display: inline-flex;
   align-items: center;
-  color: #dc2626;
+  color: var(--blue);
 }
 
 .listItemNameContainer {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+/* Wish list layout */
+.container { min-height: calc(100svh - 4.75rem); background: transparent; }
+.content { max-width: 82rem; margin: 0 auto; padding: clamp(1rem, 3vw, 2rem) 1.5rem 4rem; }
+.header {
+  margin-bottom: 1.25rem;
+  padding: 0.4rem 0.1rem;
+}
+.title { margin: 0; color: var(--ink); font: 700 clamp(1.9rem, 4vw, 2.5rem)/1.1 Georgia, serif; letter-spacing: -0.045em; }
+.subtitle { margin: 0.4rem 0 0; color: var(--muted); font-size: 0.95rem; line-height: 1.5; }
+.grid { grid-template-columns: minmax(18rem, 0.85fr) minmax(0, 1.7fr); gap: 1.5rem; align-items: start; }
+.card { min-width: 0; padding: clamp(1.1rem, 2.2vw, 1.65rem); border: 1px solid var(--line); border-radius: 1.4rem; background: #ffffff; box-shadow: var(--shadow); }
+.cardHeader { margin-bottom: 1rem; }
+.cardTitle { margin: 0; color: var(--ink); font: 700 clamp(1.5rem, 2.4vw, 1.8rem)/1.15 Georgia, serif; letter-spacing: -0.035em; overflow-wrap: anywhere; }
+.listContainer, .itemContainer { gap: 0.6rem; }
+.listItem { padding: 0.7rem 0.85rem; border: 1px solid #dce6f3; border-radius: 0.9rem; background: #ffffff; }
+.listItem:hover { border-color: #a9c8f0; background: #f7faff; box-shadow: none; }
+.listItemSelected { border-color: #7eaceb; background: #eaf2ff; box-shadow: inset 4px 0 0 var(--blue); }
+.listRow { display: flex; align-items: center; gap: 0.3rem; }
+.listItemContent { min-width: 0; flex: 1; }
+.listItemName { color: var(--ink); font-weight: 750; overflow-wrap: anywhere; }
+.listDragHandle, .deleteButton, .deleteItemButton {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.7rem;
+  height: 2.7rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0.7rem;
+  background: transparent;
+}
+.listDragHandle { color: #8294ad; touch-action: none; }
+.listDragHandle:hover { color: var(--blue-dark); background: #eaf2ff; }
+.deleteButton, .deleteItemButton { color: #446183; }
+.deleteButton:hover, .deleteItemButton:hover { color: #24446f; background: #e3efff; }
+.folderHeader { min-height: 3.25rem; padding: 0.65rem 0.8rem; border: 1px solid #dce7f7; border-radius: 0.9rem; background: var(--lavender); }
+.folderHeader:hover { background: #dceaff; }
+.folderHeaderOver { border-color: #83abe2; background: #d7e7ff; }
+.folderTitle { color: #2a507c; }
+.folderIcon { color: #4975ae; }
+.folderLists { margin: 0.55rem 0 0 0.7rem; padding-left: 0.7rem; border-left: 2px solid #dce7f7; gap: 0.55rem; }
+.availableListsArea { min-height: 1.25rem; padding: 0; border: 0; }
+.availableListsAreaOver { background: #e8f6ee; outline: 2px dashed #72bd96; }
+.availableListsHeader { padding: 0.5rem 0; }
+.availableListsTitle { color: var(--muted); }
+.itemCard, .itemCardUnbought, .itemCardBought {
+  padding: 0.9rem;
+  border: 1px solid #dce6f3;
+  border-radius: 1rem;
+  background: white;
+}
+.itemCardBought { background: #f1fcf5; border-color: #c9e8d3; }
+.itemContent { align-items: flex-start; gap: 0.5rem; }
+.itemRow { flex-wrap: wrap; gap: 0.6rem; }
+.itemInfo { min-width: 0; flex: 1 1 10rem; }
+.itemName { display: inline; color: var(--ink); font-weight: 800; overflow-wrap: anywhere; }
+.itemNameBought { color: #286a4e; }
+.itemPrice { display: inline-flex; margin: 0.3rem 0 0 0.5rem; padding: 0.25rem 0.55rem; border-radius: 999px; color: #76522e; background: #fff0ce; font-size: 0.78rem; }
+.itemLink { width: fit-content; margin: 0.45rem 0 0; color: var(--blue-dark); font-weight: 700; text-decoration: none; }
+.itemLink:hover { color: #174a9a; text-decoration: underline; }
+.dragHandle { display: grid; place-items: center; flex-shrink: 0; width: 2.7rem; height: 2.7rem; padding: 0; border: 0; border-radius: 0.7rem; color: #66788f; background: #f1f5fb; touch-action: none; }
+.dragHandle:hover { color: var(--blue-dark); background: #eaf2ff; }
+.boughtButton { min-height: 2.7rem; padding: 0.6rem 0.8rem; border: 0; border-radius: 0.7rem; font-weight: 800; }
+.boughtButtonUnbought { color: #2356a5; background: #e3efff; }
+.boughtButtonUnbought:hover { background: #d4e6ff; }
+.boughtButtonBought { color: #246947; background: #d6f2e1; }
+.boughtButtonBought:hover { background: #c5e9d2; }
+.emptyState { padding: 1.5rem 1rem; color: var(--muted); line-height: 1.5; }
+
+@media (max-width: 900px) {
+  .grid { grid-template-columns: minmax(0, 1fr); gap: 0.85rem; }
+}
+@media (max-width: 640px) {
+  .content { padding: 1rem 0.85rem 3rem; }
+  .header { margin-bottom: 0.85rem; padding: 0.25rem 0.1rem; }
+  .card { padding: 1rem; border-radius: 1.15rem; }
+  .itemRow { align-items: flex-start; }
+  .itemInfo { flex-basis: calc(100% - 3.4rem); }
+  .boughtButton { flex: 1 0 100%; }
 }
