@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { supabase, WishList, WishItem, ListFolder, withPurchaseStatus } from '../lib/supabase'
+import React, { useState, useEffect, useCallback } from 'react'
+import { supabase, WishList, WishItem, ListFolder, loadWishItems } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { canTrackPurchases } from '../lib/purchaseVisibility'
 import { formatPrice } from '../lib/pricing'
@@ -271,8 +271,10 @@ const AdminPage: React.FC = () => {
   const [folders, setFolders] = useState<ListFolder[]>([])
   const [selectedList, setSelectedList] = useState<WishList | null>(null)
   const [wishItems, setWishItems] = useState<WishItem[]>([])
+  const [itemsError, setItemsError] = useState(false)
+  const [purchaseStatusError, setPurchaseStatusError] = useState(false)
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
-  const hidePurchaseStatus = !canTrackPurchases(selectedList?.owner_id ?? null, member?.id)
+  const hidePurchaseStatus = !canTrackPurchases(selectedList?.owner_id ?? null, member?.id) || purchaseStatusError
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -289,12 +291,6 @@ const AdminPage: React.FC = () => {
     fetchWishLists()
     fetchFolders()
   }, [])
-
-  useEffect(() => {
-    if (selectedList) {
-      fetchWishItems(selectedList.id)
-    }
-  }, [selectedList])
 
   const fetchWishLists = async () => {
     try {
@@ -324,20 +320,23 @@ const AdminPage: React.FC = () => {
     }
   }
 
-  const fetchWishItems = async (listId: string) => {
+  const fetchWishItems = useCallback(async (listId: string, ownerId: string | null) => {
+    setItemsError(false)
     try {
-      const { data, error } = await supabase
-        .from('wish_items')
-        .select('*, wish_item_purchases(is_bought)')
-        .eq('wish_list_id', listId)
-        .order('priority', { ascending: true })
-
-      if (error) throw error
-      setWishItems(withPurchaseStatus(data || []))
+      const result = await loadWishItems(listId, canTrackPurchases(ownerId, member?.id))
+      setWishItems(result.items)
+      setPurchaseStatusError(result.purchaseError)
     } catch (error) {
       console.error('Error fetching wish items:', error)
+      setItemsError(true)
     }
-  }
+  }, [member?.id])
+
+  const selectedListId = selectedList?.id
+  const selectedOwnerId = selectedList?.owner_id
+  useEffect(() => {
+    if (selectedListId) fetchWishItems(selectedListId, selectedOwnerId ?? null)
+  }, [selectedListId, selectedOwnerId, fetchWishItems])
 
   const deleteWishList = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this wish list? This will also delete all items in it.')) return
@@ -518,7 +517,7 @@ const AdminPage: React.FC = () => {
         } catch (error) {
           console.error('Error updating priorities:', error)
           // Revert on error
-          fetchWishItems(selectedList!.id)
+          fetchWishItems(selectedList!.id, selectedList!.owner_id)
         }
       }
     }
@@ -642,7 +641,9 @@ const AdminPage: React.FC = () => {
                           onDelete={deleteWishItem}
                         />
                       ))}
-                      {wishItems.length === 0 && (
+                      {itemsError && <p className={styles.emptyState} role="alert">Couldn't load items. Choose the list again to retry.</p>}
+                      {purchaseStatusError && <p className={styles.emptyState}>Purchase tracking is temporarily unavailable.</p>}
+                      {!itemsError && wishItems.length === 0 && (
                         <p className={styles.emptyState}>No items in this list yet</p>
                       )}
                     </div>

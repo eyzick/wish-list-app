@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef, useId } from 'react'
-import { supabase, WishList, WishItem, ListFolder, withPurchaseStatus } from '../lib/supabase'
+import React, { useState, useEffect, useRef, useId, useCallback } from 'react'
+import { supabase, WishList, WishItem, ListFolder, withPurchaseStatus, loadWishItems } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { canTrackPurchases } from '../lib/purchaseVisibility'
 import { formatPrice, parsePrice, sortByPriceLowToHigh } from '../lib/pricing'
-import { ExternalLink, Check, ShoppingCart, Gift, Plus, GripVertical, Edit2, ChevronUp, ChevronDown, Star, Folder, FolderPlus, CandyCane, Globe2, LockKeyhole } from 'lucide-react'
+import { ExternalLink, Check, ShoppingCart, Gift, Plus, GripVertical, Edit2, ChevronUp, ChevronDown, Star, Folder, FolderPlus, CandyCane, Globe2, LockKeyhole, RefreshCw } from 'lucide-react'
 import toast, { Toaster } from 'react-hot-toast'
 import styles from '../styles/WishListPage.module.css'
 import {
@@ -446,10 +446,14 @@ const DroppableAvailableLists: React.FC<{ children: React.ReactNode }> = ({ chil
 const WishListPage: React.FC = () => {
   const { member } = useAuth()
   const itemsSectionRef = useRef<HTMLDivElement>(null)
+  const itemsRequestId = useRef(0)
   const [wishLists, setWishLists] = useState<WishList[]>([])
   const [folders, setFolders] = useState<ListFolder[]>([])
   const [selectedList, setSelectedList] = useState<WishList | null>(null)
   const [wishItems, setWishItems] = useState<WishItem[]>([])
+  const [itemsLoading, setItemsLoading] = useState(false)
+  const [itemsError, setItemsError] = useState(false)
+  const [purchaseStatusError, setPurchaseStatusError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [showAddList, setShowAddList] = useState(false)
   const [showAddItem, setShowAddItem] = useState(false)
@@ -480,9 +484,16 @@ const WishListPage: React.FC = () => {
   const [excludeBoughtLists, setExcludeBoughtLists] = useState<Set<string>>(new Set())
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
   const [sortMode, setSortMode] = useState<'priority' | 'price'>('priority')
-  const hidePurchaseStatus = !canTrackPurchases(selectedList?.owner_id ?? null, member?.id)
+  const hidePurchaseStatus = !canTrackPurchases(selectedList?.owner_id ?? null, member?.id) || purchaseStatusError
 
   const selectList = (list: WishList) => {
+    if (selectedList?.id !== list.id) {
+      itemsRequestId.current += 1
+      setWishItems([])
+      setItemsLoading(true)
+      setItemsError(false)
+      setPurchaseStatusError(false)
+    }
     setSelectedList(list)
     if (window.matchMedia?.('(max-width: 767px)').matches) {
       requestAnimationFrame(() => itemsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
@@ -513,7 +524,7 @@ const WishListPage: React.FC = () => {
     })
   }
 
-  const fetchFolders = async () => {
+  const fetchFolders = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('list_folders')
@@ -527,7 +538,7 @@ const WishListPage: React.FC = () => {
     } catch (error) {
       console.error('Error fetching folders:', error)
     }
-  }
+  }, [])
 
   const addFolder = async () => {
     if (!newFolderName.trim()) return
@@ -566,18 +577,7 @@ const WishListPage: React.FC = () => {
     })
   )
 
-  useEffect(() => {
-    fetchWishLists()
-    fetchFolders()
-  }, [])
-
-  useEffect(() => {
-    if (selectedList) {
-      fetchWishItems(selectedList.id)
-    }
-  }, [selectedList])
-
-  const fetchWishLists = async () => {
+  const fetchWishLists = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('wish_lists')
@@ -586,27 +586,60 @@ const WishListPage: React.FC = () => {
 
       if (error) throw error
       setWishLists(data || [])
+      setSelectedList(current => {
+        if (!current) return null
+        return (data || []).find(list => list.id === current.id) || null
+      })
     } catch (error) {
       console.error('Error fetching wish lists:', error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  const fetchWishItems = async (listId: string) => {
+  const fetchWishItems = useCallback(async (listId: string, ownerId: string | null) => {
+    const requestId = ++itemsRequestId.current
+    setItemsLoading(true)
+    setItemsError(false)
     try {
-      const { data, error } = await supabase
-        .from('wish_items')
-        .select('*, wish_item_purchases(is_bought)')
-        .eq('wish_list_id', listId)
-        .order('priority', { ascending: true })
-
-      if (error) throw error
-      setWishItems(withPurchaseStatus(data || []))
+      const result = await loadWishItems(listId, canTrackPurchases(ownerId ?? null, member?.id))
+      if (requestId !== itemsRequestId.current) return
+      setWishItems(result.items)
+      setPurchaseStatusError(result.purchaseError)
     } catch (error) {
+      if (requestId !== itemsRequestId.current) return
       console.error('Error fetching wish items:', error)
+      setItemsError(true)
+    } finally {
+      if (requestId === itemsRequestId.current) setItemsLoading(false)
     }
-  }
+  }, [member?.id])
+
+  const selectedListId = selectedList?.id
+  const selectedOwnerId = selectedList?.owner_id
+
+  useEffect(() => {
+    fetchWishLists()
+    fetchFolders()
+  }, [fetchWishLists, fetchFolders])
+
+  useEffect(() => {
+    if (!selectedListId) return
+    fetchWishItems(selectedListId, selectedOwnerId ?? null)
+    const refresh = () => {
+      if (document.visibilityState !== 'visible') return
+      fetchWishLists()
+      fetchWishItems(selectedListId, selectedOwnerId ?? null)
+    }
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    const interval = window.setInterval(refresh, 30000)
+    return () => {
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+      window.clearInterval(interval)
+    }
+  }, [selectedListId, selectedOwnerId, fetchWishItems, fetchWishLists])
 
   const toggleItemBought = async (item: WishItem) => {
     if (hidePurchaseStatus) return
@@ -1060,7 +1093,7 @@ const WishListPage: React.FC = () => {
       } catch (error) {
         console.error('Error updating priorities:', error)
         // Revert on error
-        fetchWishItems(selectedList!.id)
+        fetchWishItems(selectedList!.id, selectedList!.owner_id)
       }
     }
   }
@@ -1400,6 +1433,17 @@ const WishListPage: React.FC = () => {
                     <option value="priority">Priority</option>
                     <option value="price">Price: low to high</option>
                   </select>
+                  <button
+                    type="button"
+                    className={styles.refreshButton}
+                    onClick={() => { fetchWishLists(); fetchWishItems(selectedList.id, selectedList.owner_id) }}
+                    disabled={itemsLoading}
+                    aria-label="Refresh list items"
+                    title="Refresh list items"
+                  >
+                    <RefreshCw size={17} aria-hidden="true" />
+                    <span>Refresh</span>
+                  </button>
                   {!hidePurchaseStatus && <label className={styles.toggleLabel}>
                     <input
                       type="checkbox"
@@ -1500,6 +1544,11 @@ const WishListPage: React.FC = () => {
                     strategy={verticalListSortingStrategy}
                   >
                     <div className={styles.itemContainer}>
+                      {itemsLoading && wishItems.length === 0 && <p className={styles.itemsNotice} role="status">Loading items…</p>}
+                      {itemsError && <div className={styles.itemsNotice} role="alert">
+                        <p>Couldn't load this list's items.</p>
+                        <button type="button" className={styles.refreshButton} onClick={() => fetchWishItems(selectedList.id, selectedList.owner_id)}>Try again</button>
+                      </div>}
                       {displayedWishItems.map((item) => (
                       <SortableItem
                         key={item.id}
@@ -1526,11 +1575,13 @@ const WishListPage: React.FC = () => {
                         isMoving={movingItemId === item.id}
                       />
                       ))}
-                      {displayedWishItems.length === 0 && (
+                      {!itemsLoading && !itemsError && displayedWishItems.length === 0 && (
                         <div className={styles.emptyState}>
                           <GripVertical className={styles.emptyStateIcon} />
-                          <p>No items in this list yet</p>
-                          <p className={styles.emptyStateText}>Add items to this list</p>
+                          <p>{wishItems.length > 0 ? 'All items are hidden by your filter' : 'No items in this list yet'}</p>
+                          <p className={styles.emptyStateText}>{wishItems.length > 0
+                            ? 'Turn off Hide bought items to see everything.'
+                            : selectedList.owner_id === member?.id ? 'Add items to this list' : 'Check again when the owner adds items.'}</p>
                         </div>
                       )}
                     </div>
@@ -1538,7 +1589,9 @@ const WishListPage: React.FC = () => {
                 </DndContext>
 
                 {/* Summary */}
-                {hidePurchaseStatus
+                {itemsLoading || itemsError ? null : purchaseStatusError
+                  ? <p className={styles.emptyStateText}>Purchase tracking is temporarily unavailable. Refresh to try again.</p>
+                  : hidePurchaseStatus
                   ? <p className={styles.emptyStateText}>Purchase tracking is hidden for this list.</p>
                   : <div className={styles.summaryCard}>
                   <h3 className={styles.summaryTitle}>Summary</h3>

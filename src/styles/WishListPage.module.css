@@ -1193,6 +1193,26 @@
 .visibilityBadge { display: inline-flex; align-items: center; gap: 0.25rem; margin-top: 0.35rem; padding: 0.2rem 0.45rem; border-radius: 999px; font-size: 0.68rem; font-weight: 700; }
 .visibilityBadgePublic { background: #eaf2ff; color: #2459a9; }
 .visibilityBadgePrivate { background: #eef0f5; color: #4a5870; }
+.refreshButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 2.55rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid #cbdcf0;
+  border-radius: 0.7rem;
+  background: #fff;
+  color: var(--blue-dark);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.refreshButton:hover { background: #eef5ff; }
+.refreshButton:disabled { opacity: 0.55; cursor: wait; }
+.itemsNotice { padding: 1rem; color: var(--muted); text-align: center; }
+.itemsNotice p { margin: 0 0 0.6rem; }
 @media (max-width: 390px) { .visibilityOption { padding: 0.5rem; gap: 0.4rem; } .visibilityOption svg { width: 16px; } }
 .addForm .input, .editForm .input {
   min-height: 2.8rem;

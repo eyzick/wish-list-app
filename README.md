@@ -17,6 +17,8 @@ Purchase status lives in `wish_item_purchases`, separate from item names, prices
 
 Database policies limit list and item deletion to admins. Any signed-in member can create their own list; only its owner can edit the list, add items, or edit and reorder its items, whether it is public or private.
 
+Open lists refresh when the app regains focus and every 30 seconds while visible. Use **Refresh** to check immediately for another person's new items. If an item request fails, the app shows an error instead of an empty-list message.
+
 ## Prices and sorting
 
 Item prices are optional USD amounts with up to two decimal places. In a list, choose **Price: low to high** from **Sort items** to see priced items in ascending order; items without a price appear last. Choose **Priority** to return to the saved manual order. Dragging and priority controls are available only in Priority view.

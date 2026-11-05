@@ -50,3 +50,31 @@ export const withPurchaseStatus = (rows: any[]): WishItem[] => rows.map(row => {
   const { wish_item_purchases, ...item } = row
   return { ...item, is_bought: purchase?.is_bought ?? false } as WishItem
 })
+
+// Read items independently so a purchase-tracking request cannot hide the list's items.
+export const loadWishItems = async (listId: string, includePurchases: boolean): Promise<{
+  items: WishItem[]
+  purchaseError: boolean
+}> => {
+  const { data, error } = await supabase
+    .from('wish_items')
+    .select('*')
+    .eq('wish_list_id', listId)
+    .order('priority', { ascending: true })
+
+  if (error) throw error
+  const items = (data || []).map(item => ({ ...item, is_bought: false })) as WishItem[]
+  if (!includePurchases || items.length === 0) return { items, purchaseError: false }
+
+  const { data: purchases, error: purchaseError } = await supabase
+    .from('wish_item_purchases')
+    .select('item_id, is_bought')
+    .in('item_id', items.map(item => item.id))
+
+  if (purchaseError) return { items, purchaseError: true }
+  const boughtById = new Map((purchases || []).map(purchase => [purchase.item_id, purchase.is_bought]))
+  return {
+    items: items.map(item => ({ ...item, is_bought: boughtById.get(item.id) ?? false })),
+    purchaseError: false,
+  }
+}
