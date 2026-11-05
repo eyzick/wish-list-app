@@ -3,6 +3,16 @@ import { useAuth } from '../contexts/AuthContext'
 import { Lock, Eye, EyeOff } from 'lucide-react'
 import styles from '../styles/LoginPage.module.css'
 
+const signupErrorMessage = (error: unknown) => {
+  if (error instanceof Error && (
+    ('code' in error && error.code === 'over_email_send_rate_limit') ||
+    /email rate limit exceeded/i.test(error.message)
+  )) {
+    return 'Confirmation emails are temporarily unavailable. Please try again in about an hour or ask the site owner to enable more email capacity.'
+  }
+  return error instanceof Error ? error.message : 'Could not create account'
+}
+
 const LoginPage: React.FC = () => {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [name, setName] = useState('')
@@ -36,7 +46,7 @@ const LoginPage: React.FC = () => {
         await login(email.trim(), password)
       }
     }
-    catch (err) { setError(err instanceof Error ? err.message : mode === 'signup' ? 'Could not create account' : 'Could not sign in') }
+    catch (err) { setError(mode === 'signup' ? signupErrorMessage(err) : err instanceof Error ? err.message : 'Could not sign in') }
     finally { setSubmitting(false) }
   }
 

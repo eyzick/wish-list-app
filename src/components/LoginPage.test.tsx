@@ -39,3 +39,20 @@ test('sign-up rejects mismatched passwords before contacting Supabase', () => {
   expect(screen.getByRole('alert')).toHaveTextContent('Passwords do not match')
   expect(signup).not.toHaveBeenCalled()
 })
+
+test('sign-up explains the confirmation email limit', async () => {
+  const signup = jest.fn().mockRejectedValue(Object.assign(new Error('email rate limit exceeded'), {
+    code: 'over_email_send_rate_limit',
+  }))
+  ;(useAuth as jest.Mock).mockReturnValue({ login: jest.fn(), signup })
+
+  render(<LoginPage />)
+  fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+  fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Alex' } })
+  fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'alex@example.com' } })
+  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Example-Test-Password-8' } })
+  fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'Example-Test-Password-8' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Confirmation emails are temporarily unavailable')
+})

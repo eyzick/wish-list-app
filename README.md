@@ -9,6 +9,8 @@ React, TypeScript, and Supabase wish lists for a small group. Every member signs
 3. Set `REACT_APP_SUPABASE_URL` and `REACT_APP_SUPABASE_ANON_KEY` in a local `.env.local` and as GitHub Actions secrets for deployment. Run `npm ci` and `npm start` locally.
 4. Open the app and choose **Create account**. Each person creates their own account. The first account becomes an admin and can delete lists, folders, and items. Later accounts are regular members. If email confirmation is enabled, opening the confirmation link signs the person in automatically in the browser that opens it. Browser sessions are separate, so confirming in another browser does not sign in the original browser tab.
 
+The live project has **Confirm email** turned off, so new accounts sign in immediately. This allows unverified email addresses. Supabase's built-in email sender allows only two confirmation emails per hour for the entire project. If email confirmation is turned back on, configure a custom SMTP sender in **Authentication → Emails → SMTP Settings** before sharing the app more widely. Otherwise new signups may receive an email rate limit error. Password recovery still requires working email delivery.
+
 Use only the public Supabase anon key in React environment variables. The old `REACT_APP_ADMIN_PASSWORD` is no longer used. With open sign-up, anyone who has the app URL can create an account and view public wish lists.
 
 ## How purchase privacy works
