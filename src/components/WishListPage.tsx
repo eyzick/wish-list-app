@@ -3,7 +3,7 @@ import { supabase, WishList, WishItem, ListFolder, withPurchaseStatus } from '..
 import { useAuth } from '../contexts/AuthContext'
 import { canTrackPurchases } from '../lib/purchaseVisibility'
 import { formatPrice, parsePrice, sortByPriceLowToHigh } from '../lib/pricing'
-import { ExternalLink, Check, ShoppingCart, Gift, Plus, GripVertical, Edit2, ChevronUp, ChevronDown, Star, Folder, FolderPlus, CandyCane } from 'lucide-react'
+import { ExternalLink, Check, ShoppingCart, Gift, Plus, GripVertical, Edit2, ChevronUp, ChevronDown, Star, Folder, FolderPlus, CandyCane, Globe2, LockKeyhole } from 'lucide-react'
 import toast, { Toaster } from 'react-hot-toast'
 import styles from '../styles/WishListPage.module.css'
 import {
@@ -29,6 +29,7 @@ import { CSS } from '@dnd-kit/utilities'
 
 interface SortableItemProps {
   item: WishItem
+  canEdit: boolean
   hidePurchaseStatus: boolean
   allowReorder: boolean
   onToggleBought: (item: WishItem) => void
@@ -110,8 +111,29 @@ const FolderPicker: React.FC<FolderPickerProps> = ({ folders, value, onChange })
   </div>
 }
 
+const VisibilityChoice: React.FC<{
+  name: string
+  isPublic: boolean
+  onChange: (isPublic: boolean) => void
+}> = ({ name, isPublic, onChange }) => <fieldset className={styles.visibilityFieldset}>
+  <legend className={styles.fieldLabel}>Who can see this list?</legend>
+  <div className={styles.visibilityOptions}>
+    <label className={`${styles.visibilityOption} ${isPublic ? styles.visibilityOptionSelected : ''}`}>
+      <input type="radio" name={name} checked={isPublic} onChange={() => onChange(true)} />
+      <Globe2 size={18} aria-hidden="true" />
+      <span><strong>Public</strong><small>Anyone signed in</small></span>
+    </label>
+    <label className={`${styles.visibilityOption} ${!isPublic ? styles.visibilityOptionSelected : ''}`}>
+      <input type="radio" name={name} checked={!isPublic} onChange={() => onChange(false)} />
+      <LockKeyhole size={18} aria-hidden="true" />
+      <span><strong>Private</strong><small>Only you</small></span>
+    </label>
+  </div>
+</fieldset>
+
 const SortableItem: React.FC<SortableItemProps> = ({ 
   item, 
+  canEdit,
   hidePurchaseStatus,
   allowReorder,
   onToggleBought, 
@@ -242,13 +264,13 @@ const SortableItem: React.FC<SortableItemProps> = ({
                 )}
               </div>
               <div className={styles.itemActions}>
-                <button
+                {canEdit && <button
                   onClick={() => onToggleStarred(item)}
                   className={`${styles.starButton} ${item.starred ? styles.starButtonStarred : styles.starButtonUnstarred}`}
                   title={item.starred ? 'Remove star' : 'Star this item'}
                 >
                   <Star className={styles.starButtonIcon} />
-                </button>
+                </button>}
                 {allowReorder && <div className={styles.priorityButtons}>
                   <button
                     onClick={() => onMoveUp(item)}
@@ -265,13 +287,13 @@ const SortableItem: React.FC<SortableItemProps> = ({
                     <ChevronDown className={styles.priorityButtonIcon} />
                   </button>
                 </div>}
-                <button
+                {canEdit && <button
                   onClick={() => onEdit(item)}
                   className={styles.editButton}
                   title="Edit item"
                 >
                   <Edit2 className={styles.editButtonIcon} />
-                </button>
+                </button>}
                 {!hidePurchaseStatus && <button
                   onClick={() => onToggleBought(item)}
                   className={`${styles.boughtButton} ${item.is_bought ? styles.boughtButtonBought : styles.boughtButtonUnbought}`}
@@ -300,12 +322,13 @@ const SortableItem: React.FC<SortableItemProps> = ({
 
 interface DraggableListProps {
   list: WishList
+  canMove: boolean
   onClick: () => void
   isSelected: boolean
   children: React.ReactNode
 }
 
-const DraggableList: React.FC<DraggableListProps> = ({ list, onClick, isSelected, children }) => {
+const DraggableList: React.FC<DraggableListProps> = ({ list, canMove, onClick, isSelected, children }) => {
   const {
     attributes,
     listeners,
@@ -314,6 +337,7 @@ const DraggableList: React.FC<DraggableListProps> = ({ list, onClick, isSelected
     isDragging,
   } = useSortable({ 
     id: list.id,
+    disabled: !canMove,
     data: {
       type: 'list',
       list,
@@ -343,7 +367,7 @@ const DraggableList: React.FC<DraggableListProps> = ({ list, onClick, isSelected
     >
       <div className={styles.listRow}>
         <div className={styles.listBody}>{children}</div>
-        <button
+        {canMove && <button
           {...attributes}
           {...listeners}
           type="button"
@@ -352,7 +376,7 @@ const DraggableList: React.FC<DraggableListProps> = ({ list, onClick, isSelected
           onClick={(event) => event.stopPropagation()}
         >
           <GripVertical size={18} />
-        </button>
+        </button>}
       </div>
     </div>
   )
@@ -431,6 +455,7 @@ const WishListPage: React.FC = () => {
   const [showAddItem, setShowAddItem] = useState(false)
   const [showAddFolder, setShowAddFolder] = useState(false)
   const [newListName, setNewListName] = useState('')
+  const [newListIsPublic, setNewListIsPublic] = useState(true)
   const [newFolderName, setNewFolderName] = useState('')
   const [newListIsChristmas, setNewListIsChristmas] = useState(false)
   const [newListFolderId, setNewListFolderId] = useState<string>('')
@@ -448,6 +473,7 @@ const WishListPage: React.FC = () => {
   const [editItemDetails, setEditItemDetails] = useState('')
   const [editItemPrice, setEditItemPrice] = useState('')
   const [editListName, setEditListName] = useState('')
+  const [editListIsPublic, setEditListIsPublic] = useState(true)
   const [editListIsChristmas, setEditListIsChristmas] = useState(false)
   const [editListFolderId, setEditListFolderId] = useState<string>('')
   const [movingItemId, setMovingItemId] = useState<string | null>(null)
@@ -602,6 +628,7 @@ const WishListPage: React.FC = () => {
   }
 
   const toggleItemStarred = async (item: WishItem) => {
+    if (selectedList?.owner_id !== member?.id) return
     try {
       const { error } = await supabase
         .from('wish_items')
@@ -627,6 +654,7 @@ const WishListPage: React.FC = () => {
         .insert([{ 
           name: newListName.trim(),
           owner_id: member.id,
+          is_public: newListIsPublic,
           is_christmas: newListIsChristmas,
           folder_id: newListFolderId || null
         }])
@@ -635,6 +663,7 @@ const WishListPage: React.FC = () => {
       if (error) throw error
       setWishLists([data[0], ...wishLists])
       setNewListName('')
+      setNewListIsPublic(true)
       setNewListIsChristmas(false)
       setNewListFolderId('')
       setShowAddList(false)
@@ -644,7 +673,7 @@ const WishListPage: React.FC = () => {
   }
 
   const addWishItem = async () => {
-    if (!newItemName.trim() || !selectedList) return
+    if (!newItemName.trim() || !selectedList || selectedList.owner_id !== member?.id) return
     const price = parsePrice(newItemPrice)
     if (price === undefined) {
       toast.error('Enter a valid price with up to two decimal places.')
@@ -730,6 +759,7 @@ const WishListPage: React.FC = () => {
   }
 
   const startEditItem = (item: WishItem) => {
+    if (selectedList?.owner_id !== member?.id) return
     setEditingItem(item)
     setEditItemName(item.name)
     setEditItemLink(item.link || '')
@@ -738,14 +768,16 @@ const WishListPage: React.FC = () => {
   }
 
   const startEditList = (list: WishList) => {
+    if (list.owner_id !== member?.id) return
     setEditingList(list)
     setEditListName(list.name)
+    setEditListIsPublic(list.is_public)
     setEditListIsChristmas(list.is_christmas)
     setEditListFolderId(list.folder_id || '')
   }
 
   const saveEditItem = async () => {
-    if (!editingItem || !editItemName.trim()) return
+    if (!editingItem || !editItemName.trim() || selectedList?.owner_id !== member?.id) return
     const price = parsePrice(editItemPrice)
     if (price === undefined) {
       toast.error('Enter a valid price with up to two decimal places.')
@@ -783,7 +815,7 @@ const WishListPage: React.FC = () => {
   }
 
   const saveEditList = async () => {
-    if (!editingList || !editListName.trim()) return
+    if (!editingList || !editListName.trim() || editingList.owner_id !== member?.id) return
 
     try {
       const { error } = await supabase
@@ -791,7 +823,8 @@ const WishListPage: React.FC = () => {
         .update({ 
           name: editListName.trim(),
           is_christmas: editListIsChristmas,
-          folder_id: editListFolderId || null
+          folder_id: editListFolderId || null,
+          is_public: editListIsPublic,
         })
         .eq('id', editingList.id)
 
@@ -800,17 +833,18 @@ const WishListPage: React.FC = () => {
       // Update local state
       setWishLists(wishLists.map(list => 
         list.id === editingList.id 
-          ? { ...list, name: editListName.trim(), is_christmas: editListIsChristmas, folder_id: editListFolderId || null }
+          ? { ...list, name: editListName.trim(), is_public: editListIsPublic, is_christmas: editListIsChristmas, folder_id: editListFolderId || null }
           : list
       ))
 
       // Update selected list if it's the one being edited
       if (selectedList?.id === editingList.id) {
-        setSelectedList({ ...selectedList, name: editListName.trim(), is_christmas: editListIsChristmas, folder_id: editListFolderId || null })
+        setSelectedList({ ...selectedList, name: editListName.trim(), is_public: editListIsPublic, is_christmas: editListIsChristmas, folder_id: editListFolderId || null })
       }
 
       setEditingList(null)
       setEditListName('')
+      setEditListIsPublic(true)
       setEditListIsChristmas(false)
       setEditListFolderId('')
     } catch (error) {
@@ -826,11 +860,13 @@ const WishListPage: React.FC = () => {
     setEditItemDetails('')
     setEditItemPrice('')
     setEditListName('')
+    setEditListIsPublic(true)
     setEditListIsChristmas(false)
     setEditListFolderId('')
   }
 
   const moveItemUp = async (item: WishItem) => {
+    if (selectedList?.owner_id !== member?.id) return
     const currentIndex = wishItems.findIndex(i => i.id === item.id)
     if (currentIndex <= 0) return // Already at top
 
@@ -871,6 +907,7 @@ const WishListPage: React.FC = () => {
   }
 
   const moveItemDown = async (item: WishItem) => {
+    if (selectedList?.owner_id !== member?.id) return
     const currentIndex = wishItems.findIndex(i => i.id === item.id)
     if (currentIndex >= wishItems.length - 1) return // Already at bottom
 
@@ -928,7 +965,7 @@ const WishListPage: React.FC = () => {
       const folderId = over.id as string
       const list = wishLists.find(l => l.id === listId)
 
-      if (list && list.folder_id !== folderId) {
+      if (list && list.owner_id === member?.id && list.folder_id !== folderId) {
         // Update UI optimistic
         setWishLists(prev => prev.map(l => 
           l.id === listId ? { ...l, folder_id: folderId } : l
@@ -959,7 +996,7 @@ const WishListPage: React.FC = () => {
         const listId = active.id as string
         const list = wishLists.find(l => l.id === listId)
 
-        if (list && list.folder_id) {
+        if (list && list.owner_id === member?.id && list.folder_id) {
            // Update UI optimistic
            setWishLists(prev => prev.map(l => 
             l.id === listId ? { ...l, folder_id: null } : l
@@ -982,7 +1019,7 @@ const WishListPage: React.FC = () => {
         return
     }
 
-    if (sortMode === 'price') return
+    if (sortMode === 'price' || selectedList?.owner_id !== member?.id) return
     if (over && active.id !== over.id) {
       // Use filtered items for drag indices
       const oldIndex = filteredWishItems.findIndex(item => item.id === active.id)
@@ -1057,6 +1094,7 @@ const WishListPage: React.FC = () => {
               <span className={styles.listTypeSwitch} aria-hidden="true" />
             </label>
           </div>
+          <VisibilityChoice name={`edit-list-visibility-${list.id}`} isPublic={editListIsPublic} onChange={setEditListIsPublic} />
           <div className={styles.buttonGroup}>
             <button
               onClick={saveEditList}
@@ -1086,7 +1124,7 @@ const WishListPage: React.FC = () => {
               </span>
             )}
           </span>
-          <button
+          {list.owner_id === member?.id && <button
             onClick={(e) => {
               e.stopPropagation()
               startEditList(list)
@@ -1095,8 +1133,12 @@ const WishListPage: React.FC = () => {
             title="Edit list"
           >
             <Edit2 className={styles.editButtonIcon} />
-          </button>
+          </button>}
         </div>
+        <span className={`${styles.visibilityBadge} ${list.is_public ? styles.visibilityBadgePublic : styles.visibilityBadgePrivate}`}>
+          {list.is_public ? <Globe2 size={13} aria-hidden="true" /> : <LockKeyhole size={13} aria-hidden="true" />}
+          {list.is_public ? 'Public · anyone signed in' : 'Private · only you'}
+        </span>
         <p className={styles.listItemDate}>
           Created {new Date(list.created_at).toLocaleDateString()}
         </p>
@@ -1211,6 +1253,7 @@ const WishListPage: React.FC = () => {
                     <span className={styles.listTypeSwitch} aria-hidden="true" />
                   </label>
                 </div>
+                <VisibilityChoice name="new-list-visibility" isPublic={newListIsPublic} onChange={setNewListIsPublic} />
                 <div className={styles.buttonGroup}>
                   <button
                     onClick={addWishList}
@@ -1223,6 +1266,7 @@ const WishListPage: React.FC = () => {
                     onClick={() => {
                       setShowAddList(false)
                       setNewListName('')
+                      setNewListIsPublic(true)
                       setNewListIsChristmas(false)
                       setNewListFolderId('')
                     }}
@@ -1290,6 +1334,7 @@ const WishListPage: React.FC = () => {
                         <DraggableList
                           key={list.id}
                           list={list}
+                          canMove={list.owner_id === member?.id}
                           onClick={() => selectList(list)}
                           isSelected={selectedList?.id === list.id}
                         >
@@ -1313,6 +1358,7 @@ const WishListPage: React.FC = () => {
                 <DraggableList
                   key={list.id}
                   list={list}
+                  canMove={list.owner_id === member?.id}
                   onClick={() => selectList(list)}
                   isSelected={selectedList?.id === list.id}
                 >
@@ -1363,13 +1409,13 @@ const WishListPage: React.FC = () => {
                     />
                     <span className={styles.toggleText}>Hide bought items</span>
                   </label>}
-                  <button
+                  {selectedList.owner_id === member?.id && <button
                     onClick={() => setShowAddItem(true)}
                     className={styles.addButton}
                   >
                     <Plus className={styles.addButtonIcon} />
                     Add Item
-                  </button>
+                  </button>}
                 </div>
               )}
             </div>
@@ -1381,7 +1427,7 @@ const WishListPage: React.FC = () => {
               </div>
             )}
 
-            {selectedList && showAddItem && (
+            {selectedList && selectedList.owner_id === member?.id && showAddItem && (
               <div className={styles.addForm}>
                 <input
                   type="text"
@@ -1458,8 +1504,9 @@ const WishListPage: React.FC = () => {
                       <SortableItem
                         key={item.id}
                         item={item}
+                        canEdit={selectedList.owner_id === member?.id}
                         hidePurchaseStatus={hidePurchaseStatus}
-                        allowReorder={sortMode === 'priority'}
+                        allowReorder={sortMode === 'priority' && selectedList.owner_id === member?.id}
                         onToggleBought={toggleItemBought}
                         onEdit={startEditItem}
                         onMoveUp={moveItemUp}

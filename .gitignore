@@ -24,3 +24,4 @@ yarn-debug.log*
 yarn-error.log*
 *.sql
 !supabase-signup-upgrade.sql
+!supabase-list-visibility.sql

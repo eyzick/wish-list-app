@@ -28,12 +28,13 @@ import { CSS } from '@dnd-kit/utilities'
 
 interface AdminSortableItemProps {
   item: WishItem
+  canReorder: boolean
   hidePurchaseStatus: boolean
   onToggleBought: (item: WishItem) => void
   onDelete: (id: string) => void
 }
 
-const AdminSortableItem: React.FC<AdminSortableItemProps> = ({ item, hidePurchaseStatus, onToggleBought, onDelete }) => {
+const AdminSortableItem: React.FC<AdminSortableItemProps> = ({ item, canReorder, hidePurchaseStatus, onToggleBought, onDelete }) => {
   const {
     attributes,
     listeners,
@@ -41,7 +42,7 @@ const AdminSortableItem: React.FC<AdminSortableItemProps> = ({ item, hidePurchas
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: item.id })
+  } = useSortable({ id: item.id, disabled: !canReorder })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -58,14 +59,14 @@ const AdminSortableItem: React.FC<AdminSortableItemProps> = ({ item, hidePurchas
       <div className={styles.itemContent}>
         <div className={styles.itemMain}>
           <div className={styles.itemRow}>
-            <button
+            {canReorder && <button
               {...attributes}
               {...listeners}
               className={styles.dragHandle}
               title="Drag to reorder items by priority"
             >
               <GripVertical className={styles.boughtButtonIcon} />
-            </button>
+            </button>}
             <div className={styles.itemInfo}>
               <span className={`${styles.itemName} ${item.is_bought ? styles.itemNameBought : styles.itemNameUnbought}`}>
                 {item.name}
@@ -164,12 +165,13 @@ const DroppableFolder: React.FC<DroppableFolderProps> = ({ folder, children, isE
 
 interface DraggableListProps {
   list: WishList
+  canMove: boolean
   isSelected: boolean
   onClick: () => void
   onDelete: () => void
 }
 
-const DraggableList: React.FC<DraggableListProps> = ({ list, isSelected, onClick, onDelete }) => {
+const DraggableList: React.FC<DraggableListProps> = ({ list, canMove, isSelected, onClick, onDelete }) => {
   const {
     attributes,
     listeners,
@@ -179,6 +181,7 @@ const DraggableList: React.FC<DraggableListProps> = ({ list, isSelected, onClick
     isDragging,
   } = useSortable({
     id: list.id,
+    disabled: !canMove,
     data: {
       type: 'list',
       list,
@@ -228,7 +231,7 @@ const DraggableList: React.FC<DraggableListProps> = ({ list, isSelected, onClick
           <Trash2 className={styles.deleteButtonIcon} />
         </button>
       </div>
-      <button
+      {canMove && <button
         {...attributes}
         {...listeners}
         type="button"
@@ -237,7 +240,7 @@ const DraggableList: React.FC<DraggableListProps> = ({ list, isSelected, onClick
         onClick={(event) => event.stopPropagation()}
       >
         <GripVertical size={18} />
-      </button>
+      </button>}
       </div>
     </div>
   )
@@ -444,7 +447,7 @@ const AdminPage: React.FC = () => {
       const folderId = over.id as string
       const list = wishLists.find(l => l.id === listId)
 
-      if (list && list.folder_id !== folderId) {
+      if (list && list.owner_id === member?.id && list.folder_id !== folderId) {
         // Optimistic update
         setWishLists(prev => prev.map(l =>
           l.id === listId ? { ...l, folder_id: folderId } : l
@@ -470,7 +473,7 @@ const AdminPage: React.FC = () => {
       const listId = active.id as string
       const list = wishLists.find(l => l.id === listId)
 
-      if (list && list.folder_id) {
+      if (list && list.owner_id === member?.id && list.folder_id) {
         // Optimistic update
         setWishLists(prev => prev.map(l =>
           l.id === listId ? { ...l, folder_id: null } : l
@@ -491,7 +494,7 @@ const AdminPage: React.FC = () => {
     }
 
     // Handle item reordering (existing logic)
-    if (over && active.id !== over.id && active.data.current?.type !== 'list') {
+    if (selectedList?.owner_id === member?.id && over && active.id !== over.id && active.data.current?.type !== 'list') {
       const oldIndex = wishItems.findIndex(item => item.id === active.id)
       const newIndex = wishItems.findIndex(item => item.id === over.id)
       
@@ -572,6 +575,7 @@ const AdminPage: React.FC = () => {
                             <DraggableList
                               key={list.id}
                               list={list}
+                              canMove={list.owner_id === member?.id}
                               isSelected={selectedList?.id === list.id}
                               onClick={() => setSelectedList(list)}
                               onDelete={() => deleteWishList(list.id)}
@@ -595,6 +599,7 @@ const AdminPage: React.FC = () => {
                         <DraggableList
                           key={list.id}
                           list={list}
+                          canMove={list.owner_id === member?.id}
                           isSelected={selectedList?.id === list.id}
                           onClick={() => setSelectedList(list)}
                           onDelete={() => deleteWishList(list.id)}
@@ -631,6 +636,7 @@ const AdminPage: React.FC = () => {
                         <AdminSortableItem
                           key={item.id}
                           item={item}
+                          canReorder={selectedList.owner_id === member?.id}
                           hidePurchaseStatus={hidePurchaseStatus}
                           onToggleBought={toggleItemBought}
                           onDelete={deleteWishItem}

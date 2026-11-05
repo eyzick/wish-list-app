@@ -1169,6 +1169,31 @@
   font-size: 0.75rem;
   font-weight: 750;
 }
+.visibilityFieldset { min-width: 0; margin: 0 0 1rem; padding: 0; border: 0; }
+.visibilityOptions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+.visibilityOption {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+  min-height: 3.8rem;
+  padding: 0.65rem;
+  border: 1px solid #d4e0ee;
+  border-radius: 0.75rem;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+.visibilityOptionSelected { border-color: var(--blue); background: #eaf2ff; box-shadow: 0 0 0 1px var(--blue); }
+.visibilityOption input { accent-color: var(--blue); flex-shrink: 0; }
+.visibilityOption svg { flex-shrink: 0; color: var(--blue-dark); }
+.visibilityOption span { display: grid; min-width: 0; line-height: 1.2; }
+.visibilityOption strong { font-size: 0.82rem; }
+.visibilityOption small { margin-top: 0.2rem; color: var(--muted); font-size: 0.69rem; }
+.visibilityBadge { display: inline-flex; align-items: center; gap: 0.25rem; margin-top: 0.35rem; padding: 0.2rem 0.45rem; border-radius: 999px; font-size: 0.68rem; font-weight: 700; }
+.visibilityBadgePublic { background: #eaf2ff; color: #2459a9; }
+.visibilityBadgePrivate { background: #eef0f5; color: #4a5870; }
+@media (max-width: 390px) { .visibilityOption { padding: 0.5rem; gap: 0.4rem; } .visibilityOption svg { width: 16px; } }
 .addForm .input, .editForm .input {
   min-height: 2.8rem;
   margin: 0 0 0.9rem;

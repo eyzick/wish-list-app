@@ -39,6 +39,7 @@ CREATE TABLE public.wish_lists (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id uuid NOT NULL REFERENCES public.members(id),
   name text NOT NULL,
+  is_public boolean NOT NULL DEFAULT true,
   is_christmas boolean NOT NULL DEFAULT false,
   folder_id uuid REFERENCES public.list_folders(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -129,15 +130,36 @@ CREATE FUNCTION public.is_member_admin()
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = ''
 AS $$ SELECT EXISTS (SELECT 1 FROM public.members WHERE id = auth.uid() AND is_admin) $$;
 
+CREATE FUNCTION public.can_view_list(p_list_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = ''
+AS $$
+  SELECT auth.uid() IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.wish_lists l
+    WHERE l.id = p_list_id AND (l.is_public OR l.owner_id = auth.uid())
+  )
+$$;
+
+CREATE FUNCTION public.owns_list(p_list_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = ''
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.wish_lists l
+    WHERE l.id = p_list_id AND l.owner_id = auth.uid()
+  )
+$$;
+
 CREATE FUNCTION public.purchase_visible(p_item_id uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = ''
 AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.wish_items i
     JOIN public.wish_lists l ON l.id = i.wish_list_id
-    WHERE i.id = p_item_id AND l.owner_id <> auth.uid()
+    WHERE i.id = p_item_id AND l.is_public AND l.owner_id <> auth.uid()
   )
 $$;
+
+REVOKE ALL ON FUNCTION public.can_view_list(uuid), public.owns_list(uuid), public.purchase_visible(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.can_view_list(uuid), public.owns_list(uuid), public.purchase_visible(uuid) TO authenticated;
 
 ALTER TABLE public.members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.list_folders ENABLE ROW LEVEL SECURITY;
@@ -166,26 +188,42 @@ CREATE POLICY admin_delete_folders ON public.list_folders
   FOR DELETE TO authenticated USING (public.is_member_admin());
 
 CREATE POLICY member_read_lists ON public.wish_lists
-  FOR SELECT TO authenticated USING (public.is_member());
+  FOR SELECT TO authenticated USING (
+    public.is_member() AND (is_public OR owner_id = auth.uid())
+  );
 CREATE POLICY member_insert_own_lists ON public.wish_lists
   FOR INSERT TO authenticated WITH CHECK (
     public.is_member() AND owner_id = auth.uid()
   );
 CREATE POLICY member_update_lists ON public.wish_lists
-  FOR UPDATE TO authenticated USING (public.is_member())
-  WITH CHECK (public.is_member());
+  FOR UPDATE TO authenticated USING (
+    public.is_member() AND owner_id = auth.uid()
+  ) WITH CHECK (
+    public.is_member() AND owner_id = auth.uid()
+  );
 CREATE POLICY admin_delete_lists ON public.wish_lists
-  FOR DELETE TO authenticated USING (public.is_member_admin());
+  FOR DELETE TO authenticated USING (
+    public.is_member_admin() AND (is_public OR owner_id = auth.uid())
+  );
 
 CREATE POLICY member_read_items ON public.wish_items
-  FOR SELECT TO authenticated USING (public.is_member());
+  FOR SELECT TO authenticated USING (
+    public.is_member() AND public.can_view_list(wish_list_id)
+  );
 CREATE POLICY member_insert_items ON public.wish_items
-  FOR INSERT TO authenticated WITH CHECK (public.is_member());
+  FOR INSERT TO authenticated WITH CHECK (
+    public.is_member() AND public.owns_list(wish_list_id)
+  );
 CREATE POLICY member_update_items ON public.wish_items
-  FOR UPDATE TO authenticated USING (public.is_member())
-  WITH CHECK (public.is_member());
+  FOR UPDATE TO authenticated USING (
+    public.is_member() AND public.owns_list(wish_list_id)
+  ) WITH CHECK (
+    public.is_member() AND public.owns_list(wish_list_id)
+  );
 CREATE POLICY admin_delete_items ON public.wish_items
-  FOR DELETE TO authenticated USING (public.is_member_admin());
+  FOR DELETE TO authenticated USING (
+    public.is_member_admin() AND public.can_view_list(wish_list_id)
+  );
 
 CREATE POLICY other_members_read_purchases ON public.wish_item_purchases
   FOR SELECT TO authenticated USING (

@@ -22,6 +22,7 @@ export interface WishList {
   id: string
   name: string
   owner_id: string | null
+  is_public: boolean
   is_christmas: boolean
   folder_id: string | null
   created_at: string
