@@ -1038,7 +1038,7 @@
 .itemPrice { display: inline-flex; margin: 0.55rem 0 0; padding: 0.3rem 0.65rem; border-radius: 999px; color: #76522e; background: #fff0ce; font-size: 0.78rem; font-weight: 800; }
 .itemLink { width: fit-content; margin-top: 0.55rem; color: var(--blue-dark); font-weight: 700; text-decoration: none; }
 .itemLink:hover { color: #174a9a; text-decoration: underline; }
-.dragHandle, .starButton, .editButton, .priorityButton {
+.dragHandle, .starButton, .editButton, .priorityButton, .deleteItemButton {
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -1054,6 +1054,8 @@
 }
 .dragHandle { background: transparent; touch-action: none; }
 .dragHandle:hover, .starButton:hover, .editButton:hover, .priorityButton:hover { color: var(--blue-dark); background: #eaf2ff; }
+.deleteItemButton { width: 2.75rem; height: 2.75rem; min-width: 2.75rem; min-height: 2.75rem; color: #a43649; background: #fff0f2; }
+.deleteItemButton:hover { color: #8b2638; background: #ffe1e6; }
 .itemActions {
   flex: 1 0 100%;
   display: flex;

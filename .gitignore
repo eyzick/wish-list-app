@@ -25,3 +25,4 @@ yarn-error.log*
 *.sql
 !supabase-signup-upgrade.sql
 !supabase-list-visibility.sql
+!supabase-owner-delete-items.sql

@@ -224,6 +224,10 @@ CREATE POLICY admin_delete_items ON public.wish_items
   FOR DELETE TO authenticated USING (
     public.is_member_admin() AND public.can_view_list(wish_list_id)
   );
+CREATE POLICY owner_delete_items ON public.wish_items
+  FOR DELETE TO authenticated USING (
+    public.is_member() AND public.owns_list(wish_list_id)
+  );
 
 CREATE POLICY other_members_read_purchases ON public.wish_item_purchases
   FOR SELECT TO authenticated USING (

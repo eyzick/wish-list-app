@@ -3,7 +3,7 @@ import { supabase, WishList, WishItem, ListFolder, withPurchaseStatus, loadWishI
 import { useAuth } from '../contexts/AuthContext'
 import { canTrackPurchases } from '../lib/purchaseVisibility'
 import { formatPrice, parsePrice, sortByPriceLowToHigh } from '../lib/pricing'
-import { ExternalLink, Check, ShoppingCart, Gift, Plus, GripVertical, Edit2, ChevronUp, ChevronDown, Star, Folder, FolderPlus, CandyCane, Globe2, LockKeyhole, RefreshCw } from 'lucide-react'
+import { ExternalLink, Check, ShoppingCart, Gift, Plus, GripVertical, Edit2, ChevronUp, ChevronDown, Star, Folder, FolderPlus, CandyCane, Globe2, LockKeyhole, RefreshCw, Trash2 } from 'lucide-react'
 import toast, { Toaster } from 'react-hot-toast'
 import styles from '../styles/WishListPage.module.css'
 import {
@@ -34,6 +34,7 @@ interface SortableItemProps {
   allowReorder: boolean
   onToggleBought: (item: WishItem) => void
   onEdit: (item: WishItem) => void
+  onDelete: (item: WishItem) => void
   onMoveUp: (item: WishItem) => void
   onMoveDown: (item: WishItem) => void
   onToggleStarred: (item: WishItem) => void
@@ -138,6 +139,7 @@ const SortableItem: React.FC<SortableItemProps> = ({
   allowReorder,
   onToggleBought, 
   onEdit, 
+  onDelete,
   onMoveUp,
   onMoveDown,
   onToggleStarred,
@@ -293,6 +295,15 @@ const SortableItem: React.FC<SortableItemProps> = ({
                   title="Edit item"
                 >
                   <Edit2 className={styles.editButtonIcon} />
+                </button>}
+                {canEdit && <button
+                  type="button"
+                  onClick={() => onDelete(item)}
+                  className={styles.deleteItemButton}
+                  aria-label={`Delete ${item.name}`}
+                  title="Delete item"
+                >
+                  <Trash2 size={18} aria-hidden="true" />
                 </button>}
                 {!hidePurchaseStatus && <button
                   onClick={() => onToggleBought(item)}
@@ -675,6 +686,28 @@ const WishListPage: React.FC = () => {
       ))
     } catch (error) {
       console.error('Error updating wish item starred status:', error)
+    }
+  }
+
+  const deleteWishItem = async (item: WishItem) => {
+    if (!selectedList || selectedList.owner_id !== member?.id || item.wish_list_id !== selectedList.id) return
+    if (!window.confirm(`Delete “${item.name}” from your list? This cannot be undone.`)) return
+
+    try {
+      const { error } = await supabase
+        .from('wish_items')
+        .delete()
+        .eq('id', item.id)
+        .eq('wish_list_id', selectedList.id)
+        .select('id')
+        .single()
+
+      if (error) throw error
+      setWishItems(items => items.filter(current => current.id !== item.id))
+      toast.success('Item deleted')
+    } catch (error) {
+      console.error('Error deleting wish item:', error)
+      toast.error('Could not delete this item. Please try again.')
     }
   }
 
@@ -1558,6 +1591,7 @@ const WishListPage: React.FC = () => {
                         allowReorder={sortMode === 'priority' && selectedList.owner_id === member?.id}
                         onToggleBought={toggleItemBought}
                         onEdit={startEditItem}
+                        onDelete={deleteWishItem}
                         onMoveUp={moveItemUp}
                         onMoveDown={moveItemDown}
                         onToggleStarred={toggleItemStarred}
