@@ -1,5 +1,5 @@
 import React from 'react'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import WishListPage from './WishListPage'
 import { useAuth } from '../contexts/AuthContext'
 import { loadWishItems, supabase } from '../lib/supabase'
@@ -57,6 +57,29 @@ const openList = async () => {
   fireEvent.click(listButton)
   await screen.findByText('A book')
 }
+
+test('shows a loading shell while the first page request is pending', async () => {
+  auth.mockReturnValue({ member: { id: 'owner-1', name: 'Owner', is_admin: false } })
+
+  render(<WishListPage />)
+
+  expect(screen.getByRole('status')).toHaveTextContent('Loading wish lists')
+  await screen.findByRole('button', { name: /Ideas.*Public/ })
+})
+
+test('shows item placeholders while an opened list loads', async () => {
+  auth.mockReturnValue({ member: { id: 'owner-1', name: 'Owner', is_admin: false } })
+  let resolveItems: (value: { items: typeof item[]; purchaseError: boolean }) => void = () => {}
+  loadItems.mockReturnValue(new Promise(resolve => { resolveItems = resolve }))
+
+  render(<WishListPage />)
+  fireEvent.click(await screen.findByRole('button', { name: /Ideas.*Public/ }))
+
+  expect(await screen.findByText(/Loading items in Ideas/)).toBeInTheDocument()
+  await act(async () => resolveItems({ items: [item], purchaseError: false }))
+  expect(await screen.findByText('A book')).toBeInTheDocument()
+  expect(screen.queryByText('Loading items in Ideas')).not.toBeInTheDocument()
+})
 
 test('the owner can delete an item from their list', async () => {
   auth.mockReturnValue({ member: { id: 'owner-1', name: 'Owner', is_admin: false } })

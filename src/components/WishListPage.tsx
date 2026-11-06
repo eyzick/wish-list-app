@@ -3,6 +3,7 @@ import { supabase, WishList, WishItem, ListFolder, withPurchaseStatus, loadWishI
 import { useAuth } from '../contexts/AuthContext'
 import { canTrackPurchases } from '../lib/purchaseVisibility'
 import { formatPrice, parsePrice, sortByPriceLowToHigh } from '../lib/pricing'
+import PageLoading, { ItemSkeletons } from './PageLoading'
 import { ExternalLink, Check, ShoppingCart, Gift, Plus, GripVertical, Edit2, ChevronUp, ChevronDown, Star, Folder, FolderPlus, CandyCane, Globe2, LockKeyhole, RefreshCw, Trash2 } from 'lucide-react'
 import toast, { Toaster } from 'react-hot-toast'
 import styles from '../styles/WishListPage.module.css'
@@ -232,11 +233,13 @@ const SortableItem: React.FC<SortableItemProps> = ({
           </div>
         ) : (
           <div className={styles.itemMain}>
-            <div className={styles.itemRow}>
+            <div className={`${styles.itemRow} ${allowReorder ? styles.itemRowReorderable : ''}`}>
               {allowReorder && <button
                 {...attributes}
                 {...listeners}
+                type="button"
                 className={styles.dragHandle}
+                aria-label={`Drag ${item.name} to reorder`}
                 title="Drag to reorder items by priority"
               >
                 <GripVertical className={styles.boughtButtonIcon} />
@@ -250,48 +253,55 @@ const SortableItem: React.FC<SortableItemProps> = ({
                     {item.details}
                   </p>
                 )}
-                {item.price !== null && (
-                  <p className={styles.itemPrice}>{formatPrice(item.price)}</p>
-                )}
-                {item.link && (
-                  <a
+                {(item.price !== null || item.link) && <div className={styles.itemMeta}>
+                  {item.price !== null && <span className={styles.itemPrice}>{formatPrice(item.price)}</span>}
+                  {item.link && <a
                     href={item.link}
                     target="_blank"
                     rel="noopener noreferrer"
                     className={styles.itemLink}
                   >
                     <ExternalLink className={styles.itemLinkIcon} />
-                    View Link
-                  </a>
-                )}
+                    View link
+                  </a>}
+                </div>}
               </div>
               <div className={styles.itemActions}>
                 {canEdit && <button
+                  type="button"
                   onClick={() => onToggleStarred(item)}
                   className={`${styles.starButton} ${item.starred ? styles.starButtonStarred : styles.starButtonUnstarred}`}
+                  aria-label={item.starred ? `Remove star from ${item.name}` : `Star ${item.name}`}
+                  aria-pressed={item.starred}
                   title={item.starred ? 'Remove star' : 'Star this item'}
                 >
                   <Star className={styles.starButtonIcon} />
                 </button>}
                 {allowReorder && <div className={styles.priorityButtons}>
                   <button
+                    type="button"
                     onClick={() => onMoveUp(item)}
                     className={styles.priorityButton}
+                    aria-label={`Move ${item.name} up in priority`}
                     title="Move up in priority"
                   >
                     <ChevronUp className={styles.priorityButtonIcon} />
                   </button>
                   <button
+                    type="button"
                     onClick={() => onMoveDown(item)}
                     className={styles.priorityButton}
+                    aria-label={`Move ${item.name} down in priority`}
                     title="Move down in priority"
                   >
                     <ChevronDown className={styles.priorityButtonIcon} />
                   </button>
                 </div>}
                 {canEdit && <button
+                  type="button"
                   onClick={() => onEdit(item)}
                   className={styles.editButton}
+                  aria-label={`Edit ${item.name}`}
                   title="Edit item"
                 >
                   <Edit2 className={styles.editButtonIcon} />
@@ -306,8 +316,10 @@ const SortableItem: React.FC<SortableItemProps> = ({
                   <Trash2 size={18} aria-hidden="true" />
                 </button>}
                 {!hidePurchaseStatus && <button
+                  type="button"
                   onClick={() => onToggleBought(item)}
                   className={`${styles.boughtButton} ${item.is_bought ? styles.boughtButtonBought : styles.boughtButtonUnbought}`}
+                  aria-pressed={item.is_bought}
                   title={item.is_bought ? 'Click to mark as not bought' : 'Click to mark as bought'}
                 >
                   {item.is_bought ? (
@@ -1213,14 +1225,7 @@ const WishListPage: React.FC = () => {
   }
 
   if (loading) {
-    return (
-      <div className={styles.loadingContainer}>
-        <div className={styles.loadingContent}>
-          <div className={styles.spinner}></div>
-          <p className={styles.loadingText}>Loading wish lists...</p>
-        </div>
-      </div>
-    )
+    return <PageLoading message="Loading wish lists…" />
   }
 
   return (
@@ -1577,7 +1582,10 @@ const WishListPage: React.FC = () => {
                     strategy={verticalListSortingStrategy}
                   >
                     <div className={styles.itemContainer}>
-                      {itemsLoading && wishItems.length === 0 && <p className={styles.itemsNotice} role="status">Loading items…</p>}
+                      {itemsLoading && wishItems.length === 0 && <div className={styles.listLoading} role="status" aria-live="polite">
+                        <p className={styles.listLoadingLabel}><span className={styles.loadingDot} aria-hidden="true" />Loading items in {selectedList.name}…</p>
+                        <ItemSkeletons />
+                      </div>}
                       {itemsError && <div className={styles.itemsNotice} role="alert">
                         <p>Couldn't load this list's items.</p>
                         <button type="button" className={styles.refreshButton} onClick={() => fetchWishItems(selectedList.id, selectedList.owner_id)}>Try again</button>

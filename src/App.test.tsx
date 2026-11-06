@@ -16,6 +16,15 @@ test('asks a signed-out visitor to sign in', () => {
   expect(screen.queryByText('Private wish lists')).not.toBeInTheDocument()
 })
 
+test('shows the animated loading shell while checking the account', () => {
+  mockAuth.mockReturnValue({ member: null, loading: true } as ReturnType<typeof useAuth>)
+
+  render(<ProtectedRoute>{child}</ProtectedRoute>)
+
+  expect(screen.getByRole('status')).toHaveTextContent('Loading your account')
+  expect(screen.queryByText('Sign in')).not.toBeInTheDocument()
+})
+
 test('limits the admin page to admins', () => {
   mockAuth.mockReturnValue({
     member: { id: 'member-1', name: 'Alex', is_admin: false },
